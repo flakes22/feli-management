@@ -53,7 +53,7 @@ const ParticipantProfile = () => {
       setError("");
       
       const res = await API.get("/participant/profile");
-      console.log("Profile data:", res.data); // Debug log
+      console.log("Profile data:", res.data);
       
       const p = res.data;
       setProfile(p);
@@ -542,13 +542,13 @@ const ParticipantProfile = () => {
             Followed Clubs
           </Typography>
 
-          {!profile?.following || profile.following.length === 0 ? (
+          {!profile?.followedClubs || profile.followedClubs.length === 0 ? (
             <Typography variant="body2" sx={{ color: "#999" }}>
               You are not following any clubs yet. Browse events to discover organizers.
             </Typography>
           ) : (
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              {profile.following.map((org) => {
+              {profile.followedClubs.map((org) => {
                 const orgId = org._id || org;
                 const orgName = org.name || "Unknown Club";
 

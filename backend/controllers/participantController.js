@@ -20,22 +20,18 @@ export const browseEvents = async (req, res) => {
       status: "PUBLISHED",
     };
 
-    // Search (partial match on name)
     if (search) {
       filter.name = { $regex: search, $options: "i" };
     }
 
-    // Event Type filter
     if (type) {
       filter.type = type;
     }
 
-    // Eligibility filter
     if (eligibility) {
       filter.eligibility = eligibility;
     }
 
-    // Date range filter
     if (startDate && endDate) {
       filter.startDate = {
         $gte: new Date(startDate),
@@ -43,10 +39,9 @@ export const browseEvents = async (req, res) => {
       };
     }
 
-    // Followed clubs filter
     if (followedOnly === "true") {
       const participant = await Participant.findById(req.user.id);
-      filter.organizerId = { $in: participant.following };
+      filter.organizerId = { $in: participant.followedClubs };
     }
 
     const events = await Event.find(filter).populate(
@@ -91,7 +86,6 @@ export const getEventDetails = async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    // Check if user is registered
     const registration = await Registration.findOne({
       eventId,
       participantId,
@@ -197,7 +191,6 @@ export const cancelRegistration = async (req, res) => {
     registration.status = "cancelled";
     await registration.save();
 
-    // Decrement registered count in event
     await Event.findByIdAndUpdate(registration.eventId, {
       $inc: { registeredCount: -1 },
     });
@@ -213,17 +206,14 @@ export const getAllClubs = async (req, res) => {
   try {
     const participantId = req.user.id;
 
-    // Get all active organizers
     const organizers = await Organizer.find({ isActive: true }).select(
       "name category description contactEmail"
     );
 
-    // Get participant's followed organizers
     const participant = await Participant.findById(participantId).select(
-      "following"
+      "followedClubs"
     );
 
-    // Count upcoming events for each organizer
     const clubsWithFollowStatus = await Promise.all(
       organizers.map(async (org) => {
         const upcomingEvents = await Event.countDocuments({
@@ -238,7 +228,7 @@ export const getAllClubs = async (req, res) => {
           description: org.description,
           contactEmail: org.contactEmail,
           upcomingEvents,
-          isFollowing: participant.following.some(
+          isFollowing: participant.followedClubs.some(
             (id) => id.toString() === org._id.toString()
           ),
         };
@@ -265,21 +255,19 @@ export const getClubDetails = async (req, res) => {
       return res.status(404).json({ message: "Organizer not found" });
     }
 
-    // Get organizer's events
     const events = await Event.find({
       organizerId,
       status: "PUBLISHED",
     }).sort({ startDate: 1 });
 
-    // Check if following
     const participant = await Participant.findById(participantId).select(
-      "following"
+      "followedClubs"
     );
 
     res.json({
       ...organizer._doc,
       events,
-      isFollowing: participant.following.some(
+      isFollowing: participant.followedClubs.some(
         (id) => id.toString() === organizerId
       ),
     });
@@ -301,11 +289,11 @@ export const followOrganizer = async (req, res) => {
 
     const participant = await Participant.findById(participantId);
 
-    if (participant.following.some((id) => id.toString() === organizerId)) {
+    if (participant.followedClubs.some((id) => id.toString() === organizerId)) {
       return res.status(400).json({ message: "Already following" });
     }
 
-    participant.following.push(organizerId);
+    participant.followedClubs.push(organizerId);
     await participant.save();
 
     res.json({ message: "Followed successfully" });
@@ -322,11 +310,11 @@ export const unfollowOrganizer = async (req, res) => {
 
     const participant = await Participant.findById(participantId);
 
-    if (!participant.following.some((id) => id.toString() === organizerId)) {
+    if (!participant.followedClubs.some((id) => id.toString() === organizerId)) {
       return res.status(400).json({ message: "Not following" });
     }
 
-    participant.following = participant.following.filter(
+    participant.followedClubs = participant.followedClubs.filter(
       (id) => id.toString() !== organizerId
     );
     await participant.save();
@@ -344,7 +332,7 @@ export const getMyProfile = async (req, res) => {
 
     const participant = await Participant.findById(participantId)
       .select("-password")
-      .populate("following", "name category");
+      .populate("followedClubs", "name category");
 
     if (!participant) {
       return res.status(404).json({ message: "Participant not found" });
