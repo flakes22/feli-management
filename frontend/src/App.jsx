@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -22,7 +22,7 @@ import OngoingEvents from "./pages/OngoingEvents";
 
 function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <Routes>
 
         {/* ================= HOME ================= */}
@@ -160,7 +160,7 @@ function App() {
         />
 
       </Routes>
-    </BrowserRouter>
+    </Router>
   );
 }
 

@@ -21,14 +21,14 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
-app.use("/api/registration", registrationRoutes);
 
-
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/organizer/event", organizerEventRoutes); // Must come BEFORE /api/organizer
+app.use("/api/organizer/event", organizerEventRoutes); // Must be before /api/organizer
 app.use("/api/organizer", organizerRoutes);
 app.use("/api/participant", participantRoutes);
+app.use("/api/registration", registrationRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
 app.get("/", (req, res) => {

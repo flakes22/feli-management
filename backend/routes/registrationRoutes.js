@@ -1,36 +1,17 @@
 import express from "express";
+import { protect, authorize } from "../middleware/authMiddleware.js";
 import {
   registerForEvent,
   purchaseMerch,
-  myRegistrations,
+  getParticipantDashboard,
+  cancelRegistration,
 } from "../controllers/registrationController.js";
-
-import {
-  protect,
-  authorize,
-} from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post(
-  "/register",
-  protect,
-  authorize("participant"),
-  registerForEvent
-);
-
-router.post(
-  "/purchase",
-  protect,
-  authorize("participant"),
-  purchaseMerch
-);
-
-router.get(
-  "/my-registrations",
-  protect,
-  authorize("participant"),
-  myRegistrations
-);
+router.post("/register", protect, authorize("participant"), registerForEvent);
+router.post("/merch", protect, authorize("participant"), purchaseMerch);
+router.get("/dashboard", protect, authorize("participant"), getParticipantDashboard);
+router.delete("/:registrationId", protect, authorize("participant"), cancelRegistration);
 
 export default router;

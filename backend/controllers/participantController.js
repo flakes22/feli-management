@@ -1,417 +1,337 @@
 import Event from "../models/Event.js";
-import Registration from "../models/Registration.js";
-import Participant from "../models/Participant.js";
 import Organizer from "../models/Organizer.js";
-import bcrypt from "bcrypt";
+import Participant from "../models/Participant.js";
+import Registration from "../models/Registration.js";
+import bcrypt from "bcryptjs";
 
-// Browse Events
 export const browseEvents = async (req, res) => {
   try {
-    const {
-      search,
-      type,
-      eligibility,
-      startDate,
-      endDate,
-      followedOnly,
-    } = req.query;
+    const { search, type, category } = req.query;
 
-    let filter = {
-      status: "PUBLISHED",
-    };
+    let query = { status: "PUBLISHED" };
 
     if (search) {
-      filter.name = { $regex: search, $options: "i" };
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
     }
 
     if (type) {
-      filter.type = type;
+      query.type = type;
     }
 
-    if (eligibility) {
-      filter.eligibility = eligibility;
+    const events = await Event.find(query)
+      .populate("organizerId", "name category")
+      .sort({ startDate: 1 });
+
+    // Filter by organizer category if provided
+    let filteredEvents = events;
+    if (category) {
+      filteredEvents = events.filter(
+        (e) => e.organizerId?.category === category
+      );
     }
 
-    if (startDate && endDate) {
-      filter.startDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
-    }
-
-    if (followedOnly === "true") {
-      const participant = await Participant.findById(req.user.id);
-      filter.organizerId = { $in: participant.followedClubs };
-    }
-
-    const events = await Event.find(filter).populate(
-      "organizerId",
-      "name category"
-    );
-
-    res.json(events);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json(filteredEvents);
+  } catch (err) {
+    console.error("browseEvents error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Trending Events
-export const trendingEvents = async (req, res) => {
-  try {
-    const events = await Event.find({
-      status: "PUBLISHED",
-    })
-      .sort({ registeredCount: -1 })
-      .limit(10)
-      .populate("organizerId", "name category");
-
-    res.json(events);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Get Event Details
 export const getEventDetails = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const participantId = req.user.id;
 
     const event = await Event.findById(eventId).populate(
       "organizerId",
-      "name category description contactEmail"
+      "name category description email contactPhone website socialMedia"
     );
 
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    const registration = await Registration.findOne({
+    // Get registration stats
+    const totalRegs = await Registration.countDocuments({
       eventId,
-      participantId,
-      status: { $ne: "cancelled" },
+      status: { $ne: "CANCELLED" },
     });
+
+    const isDeadlinePassed =
+      event.registrationDeadline && new Date(event.registrationDeadline) < new Date();
+
+    const isLimitReached =
+      event.registrationLimit && totalRegs >= event.registrationLimit;
 
     res.json({
-      ...event._doc,
-      isRegistered: !!registration,
-      registrationId: registration?._id,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Register for Event
-export const registerForEvent = async (req, res) => {
-  try {
-    const { eventId } = req.params;
-    const participantId = req.user.id;
-
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
-    if (event.status !== "PUBLISHED") {
-      return res.status(400).json({ message: "Event is not open for registration" });
-    }
-
-    if (event.registeredCount >= event.capacity) {
-      return res.status(400).json({ message: "Event is full" });
-    }
-
-    const existingRegistration = await Registration.findOne({
-      eventId,
-      participantId,
-      status: { $ne: "cancelled" },
-    });
-
-    if (existingRegistration) {
-      return res.status(400).json({ message: "Already registered" });
-    }
-
-    const registration = await Registration.create({
-      eventId,
-      participantId,
-      status: "confirmed",
-    });
-
-    await Event.findByIdAndUpdate(eventId, {
-      $inc: { registeredCount: 1 },
-    });
-
-    res.status(201).json({ message: "Registered successfully", registration });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Get My Registrations
-export const getMyRegistrations = async (req, res) => {
-  try {
-    const participantId = req.user.id;
-
-    const registrations = await Registration.find({
-      participantId,
-      status: { $ne: "cancelled" },
-    }).populate({
-      path: "eventId",
-      populate: {
-        path: "organizerId",
-        select: "name category",
+      event,
+      stats: {
+        totalRegs,
+        isDeadlinePassed,
+        isLimitReached,
       },
     });
-
-    res.json(registrations);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error("getEventDetails error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Cancel Registration
-export const cancelRegistration = async (req, res) => {
+export const getTrendingEvents = async (req, res) => {
   try {
-    const { registrationId } = req.params;
-    const participantId = req.user.id;
+    const events = await Event.find({
+      status: "PUBLISHED",
+      startDate: { $gte: new Date() },
+    })
+      .populate("organizerId", "name category")
+      .sort({ registrationCount: -1 })
+      .limit(10);
 
-    const registration = await Registration.findOne({
-      _id: registrationId,
-      participantId,
-    });
-
-    if (!registration) {
-      return res.status(404).json({ message: "Registration not found" });
-    }
-
-    if (registration.status === "cancelled") {
-      return res.status(400).json({ message: "Already cancelled" });
-    }
-
-    registration.status = "cancelled";
-    await registration.save();
-
-    await Event.findByIdAndUpdate(registration.eventId, {
-      $inc: { registeredCount: -1 },
-    });
-
-    res.json({ message: "Registration cancelled successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json(events);
+  } catch (err) {
+    console.error("getTrendingEvents error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Get all clubs/organizers with follow status
-export const getAllClubs = async (req, res) => {
+export const getClubs = async (req, res) => {
   try {
-    const participantId = req.user.id;
+    const { search, category } = req.query;
 
-    const organizers = await Organizer.find({ isActive: true }).select(
-      "name category description contactEmail"
+    let query = { isActive: true };
+
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    if (category) {
+      query.category = category;
+    }
+
+    const clubs = await Organizer.find(query).select(
+      "-password -generatedPassword -passwordResetRequest"
     );
 
-    const participant = await Participant.findById(participantId).select(
-      "followedClubs"
-    );
+    // Get event counts for each club
+    const clubsWithStats = await Promise.all(
+      clubs.map(async (club) => {
+        const totalEvents = await Event.countDocuments({
+          organizerId: club._id,
+        });
 
-    const clubsWithFollowStatus = await Promise.all(
-      organizers.map(async (org) => {
         const upcomingEvents = await Event.countDocuments({
-          organizerId: org._id,
-          status: "PUBLISHED",
+          organizerId: club._id,
+          status: { $in: ["PUBLISHED", "ONGOING"] },
+          startDate: { $gte: new Date() },
         });
 
         return {
-          _id: org._id,
-          name: org.name,
-          category: org.category,
-          description: org.description,
-          contactEmail: org.contactEmail,
+          ...club.toObject(),
+          totalEvents,
           upcomingEvents,
-          isFollowing: participant.followedClubs.some(
-            (id) => id.toString() === org._id.toString()
-          ),
         };
       })
     );
 
-    res.json(clubsWithFollowStatus);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json(clubsWithStats);
+  } catch (err) {
+    console.error("getClubs error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Get club/organizer details
 export const getClubDetails = async (req, res) => {
   try {
     const { organizerId } = req.params;
-    const participantId = req.user.id;
 
-    const organizer = await Organizer.findById(organizerId).select(
-      "name category description contactEmail"
+    const club = await Organizer.findById(organizerId).select(
+      "-password -generatedPassword -passwordResetRequest"
     );
 
-    if (!organizer) {
-      return res.status(404).json({ message: "Organizer not found" });
+    if (!club) {
+      return res.status(404).json({ message: "Club not found" });
     }
 
+    // Get club's events
     const events = await Event.find({
       organizerId,
       status: "PUBLISHED",
-    }).sort({ startDate: 1 });
+    }).sort({ startDate: -1 });
 
-    const participant = await Participant.findById(participantId).select(
-      "followedClubs"
-    );
+    // Get stats
+    const totalEvents = await Event.countDocuments({ organizerId });
+
+    const upcomingEvents = await Event.countDocuments({
+      organizerId,
+      status: { $in: ["PUBLISHED", "ONGOING"] },
+      startDate: { $gte: new Date() },
+    });
+
+    const completedEvents = await Event.countDocuments({
+      organizerId,
+      status: "COMPLETED",
+    });
+
+    const eventIds = await Event.find({ organizerId }).distinct("_id");
+
+    const totalParticipants = await Registration.countDocuments({
+      eventId: { $in: eventIds },
+      status: { $ne: "CANCELLED" },
+    });
+
+    const followers = await Participant.countDocuments({
+      followedOrganizers: organizerId,
+    });
 
     res.json({
-      ...organizer._doc,
+      club,
       events,
-      isFollowing: participant.followedClubs.some(
-        (id) => id.toString() === organizerId
-      ),
+      stats: {
+        totalEvents,
+        upcomingEvents,
+        completedEvents,
+        totalParticipants,
+        followers,
+      },
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error("getClubDetails error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Follow organizer
-export const followOrganizer = async (req, res) => {
+export const toggleFollow = async (req, res) => {
   try {
     const { organizerId } = req.params;
     const participantId = req.user.id;
 
+    const participant = await Participant.findById(participantId);
     const organizer = await Organizer.findById(organizerId);
+
     if (!organizer) {
       return res.status(404).json({ message: "Organizer not found" });
     }
 
-    const participant = await Participant.findById(participantId);
-
-    if (participant.followedClubs.some((id) => id.toString() === organizerId)) {
-      return res.status(400).json({ message: "Already following" });
+    if (!participant.followedOrganizers) {
+      participant.followedOrganizers = [];
     }
 
-    participant.followedClubs.push(organizerId);
-    await participant.save();
+    const index = participant.followedOrganizers.indexOf(organizerId);
 
-    res.json({ message: "Followed successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    if (index > -1) {
+      // Unfollow
+      participant.followedOrganizers.splice(index, 1);
+      await participant.save();
+      res.json({ message: "Unfollowed successfully", isFollowing: false });
+    } else {
+      // Follow
+      participant.followedOrganizers.push(organizerId);
+      await participant.save();
+      res.json({ message: "Followed successfully", isFollowing: true });
+    }
+  } catch (err) {
+    console.error("toggleFollow error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Unfollow organizer
-export const unfollowOrganizer = async (req, res) => {
+export const getProfile = async (req, res) => {
   try {
-    const { organizerId } = req.params;
-    const participantId = req.user.id;
-
-    const participant = await Participant.findById(participantId);
-
-    if (!participant.followedClubs.some((id) => id.toString() === organizerId)) {
-      return res.status(400).json({ message: "Not following" });
-    }
-
-    participant.followedClubs = participant.followedClubs.filter(
-      (id) => id.toString() !== organizerId
-    );
-    await participant.save();
-
-    res.json({ message: "Unfollowed successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Get my profile
-export const getMyProfile = async (req, res) => {
-  try {
-    const participantId = req.user.id;
-
-    const participant = await Participant.findById(participantId)
+    const participant = await Participant.findById(req.user.id)
       .select("-password")
-      .populate("followedClubs", "name category");
+      .populate("followedOrganizers", "name category");
 
     if (!participant) {
-      return res.status(404).json({ message: "Participant not found" });
+      return res.status(404).json({ message: "Profile not found" });
     }
 
-    res.json(participant);
-  } catch (error) {
-    console.error("Get profile error:", error);
-    res.status(500).json({ message: error.message });
-  }
-};
+    // Get registration stats
+    const totalRegistrations = await Registration.countDocuments({
+      participantId: req.user.id,
+      status: { $ne: "CANCELLED" },
+    });
 
-// Update my profile
-export const updateMyProfile = async (req, res) => {
-  try {
-    const participantId = req.user.id;
-    const { firstName, lastName, contactNumber, collegeName, interests } =
-      req.body;
+    const upcomingEvents = await Registration.countDocuments({
+      participantId: req.user.id,
+      status: "REGISTERED",
+    });
 
-    const participant = await Participant.findByIdAndUpdate(
-      participantId,
-      {
-        firstName,
-        lastName,
-        contactNumber,
-        collegeName,
-        interests,
+    const attendedEvents = await Registration.countDocuments({
+      participantId: req.user.id,
+      status: "ATTENDED",
+    });
+
+    res.json({
+      participant,
+      stats: {
+        totalRegistrations,
+        upcomingEvents,
+        attendedEvents,
+        followingCount: participant.followedOrganizers?.length || 0,
       },
-      { new: true, runValidators: true }
-    ).select("-password");
-
-    if (!participant) {
-      return res.status(404).json({ message: "Participant not found" });
-    }
-
-    res.json({ message: "Profile updated successfully", participant });
-  } catch (error) {
-    console.error("Update profile error:", error);
-    res.status(500).json({ message: error.message });
+    });
+  } catch (err) {
+    console.error("getProfile error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Change password
+export const updateProfile = async (req, res) => {
+  try {
+    const { firstName, lastName, contactNumber, department, year } = req.body;
+
+    const participant = await Participant.findById(req.user.id);
+
+    if (!participant) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    if (firstName !== undefined) participant.firstName = firstName;
+    if (lastName !== undefined) participant.lastName = lastName;
+    if (contactNumber !== undefined) participant.contactNumber = contactNumber;
+    if (department !== undefined) participant.department = department;
+    if (year !== undefined) participant.year = year;
+
+    await participant.save();
+    res.json({ message: "Profile updated successfully" });
+  } catch (err) {
+    console.error("updateProfile error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const participantId = req.user.id;
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "New password must be at least 6 characters" });
-    }
-
-    const participant = await Participant.findById(participantId);
+    const participant = await Participant.findById(req.user.id);
 
     if (!participant) {
       return res.status(404).json({ message: "Participant not found" });
     }
 
+    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, participant.password);
 
     if (!isMatch) {
-      return res
-        .status(400)
-        .json({ message: "Current password is incorrect" });
+      return res.status(400).json({ message: "Current password is incorrect" });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    participant.password = hashedPassword;
-    await participant.save();
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    participant.password = await bcrypt.hash(newPassword, salt);
 
+    await participant.save();
     res.json({ message: "Password changed successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error("changePassword error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 

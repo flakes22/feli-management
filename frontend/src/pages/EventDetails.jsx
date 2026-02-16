@@ -3,21 +3,29 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Container,
   Typography,
-  Button,
   Box,
-  Chip,
+  Button,
   Paper,
   Grid,
-  Divider,
-  Alert,
+  Chip,
   CircularProgress,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import PersonIcon from "@mui/icons-material/Person";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import PeopleIcon from "@mui/icons-material/People";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
-import GroupIcon from "@mui/icons-material/Group";
-import CategoryIcon from "@mui/icons-material/Category";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 import API from "../services/api";
 import ParticipantNavbar from "../components/ParticipantNavbar";
@@ -26,16 +34,31 @@ const EventDetails = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
 
-  const [data, setData] = useState(null);
+  const [event, setEvent] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState(false);
-  const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const fetchEvent = async () => {
+  // Registration dialog
+  const [registerDialog, setRegisterDialog] = useState(false);
+  const [customResponses, setCustomResponses] = useState({});
+  const [registering, setRegistering] = useState(false);
+
+  const fetchEventDetails = async () => {
     try {
       const res = await API.get(`/participant/event/${eventId}`);
-      setData(res.data);
+      setEvent(res.data.event);
+      setStats(res.data.stats);
+
+      // Initialize custom responses
+      const initialResponses = {};
+      if (res.data.event.customFields) {
+        res.data.event.customFields.forEach((field) => {
+          initialResponses[field.label] = field.fieldType === "CHECKBOX" ? false : "";
+        });
+      }
+      setCustomResponses(initialResponses);
     } catch (err) {
       setError("Failed to load event details");
     } finally {
@@ -44,43 +67,32 @@ const EventDetails = () => {
   };
 
   useEffect(() => {
-    fetchEvent();
+    fetchEventDetails();
   }, [eventId]);
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "N/A";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const formatShortDate = (dateStr) => {
-    if (!dateStr) return "N/A";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   const handleRegister = async () => {
-    setRegistering(true);
     setError("");
     setSuccess("");
+    setRegistering(true);
 
     try {
-      if (data.event.type === "MERCH") {
-        await API.post("/registration/purchase", { eventId });
-        setSuccess("Purchase successful! Check your email for the ticket.");
-      } else {
-        await API.post("/registration/register", { eventId });
-        setSuccess("Registered successfully! Check your email for the ticket.");
-      }
-      // Refresh event data to update stats
-      await fetchEvent();
+      // Convert responses to array format
+      const customFieldResponses = Object.keys(customResponses).map((label) => ({
+        fieldLabel: label,
+        fieldType: event.customFields.find((f) => f.label === label)?.fieldType,
+        response: customResponses[label],
+      }));
+
+      const res = await API.post("/registration/register", {
+        eventId,
+        customFieldResponses,
+      });
+
+      setSuccess("Registration successful!");
+      setTimeout(() => {
+        setRegisterDialog(false);
+        navigate("/participant/dashboard");
+      }, 1500);
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {
@@ -88,54 +100,139 @@ const EventDetails = () => {
     }
   };
 
+  const handleCustomFieldChange = (label, value) => {
+    setCustomResponses((prev) => ({
+      ...prev,
+      [label]: value,
+    }));
+  };
+
+  const renderCustomField = (field) => {
+    const value = customResponses[field.label] || "";
+
+    switch (field.fieldType) {
+      case "TEXT":
+        return (
+          <TextField
+            fullWidth
+            size="small"
+            label={field.label}
+            required={field.required}
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.label, e.target.value)}
+          />
+        );
+
+      case "NUMBER":
+        return (
+          <TextField
+            fullWidth
+            type="number"
+            size="small"
+            label={field.label}
+            required={field.required}
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.label, e.target.value)}
+          />
+        );
+
+      case "EMAIL":
+        return (
+          <TextField
+            fullWidth
+            type="email"
+            size="small"
+            label={field.label}
+            required={field.required}
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.label, e.target.value)}
+          />
+        );
+
+      case "PHONE":
+        return (
+          <TextField
+            fullWidth
+            type="tel"
+            size="small"
+            label={field.label}
+            required={field.required}
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.label, e.target.value)}
+          />
+        );
+
+      case "DROPDOWN":
+        return (
+          <FormControl fullWidth size="small" required={field.required}>
+            <InputLabel>{field.label}</InputLabel>
+            <Select
+              value={value}
+              label={field.label}
+              onChange={(e) => handleCustomFieldChange(field.label, e.target.value)}
+            >
+              {field.options?.map((opt, idx) => (
+                <MenuItem key={idx} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        );
+
+      case "CHECKBOX":
+        return (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={value || false}
+                onChange={(e) =>
+                  handleCustomFieldChange(field.label, e.target.checked)
+                }
+                sx={{ color: "#673ab7", "&.Mui-checked": { color: "#673ab7" } }}
+              />
+            }
+            label={field.label + (field.required ? " *" : "")}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
         <ParticipantNavbar />
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: "60vh",
+          }}
+        >
           <CircularProgress sx={{ color: "#673ab7" }} />
         </Box>
       </Box>
     );
   }
 
-  if (!data) {
+  if (!event) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
         <ParticipantNavbar />
         <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Alert severity="error" sx={{ borderRadius: 2 }}>
-            Event not found or failed to load.
-          </Alert>
-          <Button
-            onClick={() => navigate("/participant/browse")}
-            sx={{ mt: 2, color: "#673ab7" }}
-          >
-            ← Back to Browse
-          </Button>
+          <Alert severity="error">Event not found</Alert>
         </Container>
       </Box>
     );
   }
 
-  const { event, stats } = data;
-
-  const isMerch = event.type === "MERCH";
-  const isDeadlinePassed = stats.isDeadlinePassed;
-  const isLimitReached = stats.isLimitReached;
-  const isNotPublished = event.status !== "PUBLISHED";
-  const isOutOfStock = isMerch && event.stock !== undefined && event.stock <= 0;
-
-  const registrationBlocked =
-    isNotPublished || isDeadlinePassed || isLimitReached || isOutOfStock;
-
-  const getBlockReason = () => {
-    if (isNotPublished) return "This event is not currently accepting registrations.";
-    if (isDeadlinePassed) return "The registration deadline has passed.";
-    if (isLimitReached) return isMerch ? "This item is out of stock." : "Registration limit has been reached.";
-    if (isOutOfStock) return "This item is out of stock.";
-    return "";
-  };
+  const isDeadlinePassed = stats?.isDeadlinePassed || false;
+  const isLimitReached = stats?.isLimitReached || false;
+  const canRegister = !isDeadlinePassed && !isLimitReached;
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
@@ -145,23 +242,10 @@ const EventDetails = () => {
         {/* Back Button */}
         <Button
           onClick={() => navigate("/participant/browse")}
-          sx={{
-            color: "#673ab7",
-            textTransform: "none",
-            fontWeight: 600,
-            mb: 2,
-            pl: 0,
-            "&:hover": { bgcolor: "transparent" },
-          }}
+          sx={{ mb: 2, textTransform: "none", color: "#673ab7" }}
         >
           ← Back to Browse
         </Button>
-
-        {success && (
-          <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-            {success}
-          </Alert>
-        )}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
@@ -169,387 +253,293 @@ const EventDetails = () => {
           </Alert>
         )}
 
-        <Grid container spacing={3}>
-          {/* Left Column — Event Details */}
-          <Grid item xs={12} md={8}>
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 3,
-                p: 4,
-              }}
-            >
-              {/* Header */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a1a2e" }}>
-                  {event.name}
-                </Typography>
+        {/* Event Header */}
+        <Paper
+          elevation={0}
+          sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              mb: 2,
+            }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 700, color: "#1a1a2e", mb: 1 }}
+              >
+                {event.name}
+              </Typography>
+
+              <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
                 <Chip
-                  label={isMerch ? "Merchandise" : "Event"}
+                  label={event.type === "NORMAL" ? "Workshop" : "Merchandise"}
                   size="small"
-                  sx={{
-                    bgcolor: isMerch ? "#fff3e0" : "#f3e8ff",
-                    color: isMerch ? "#e65100" : "#673ab7",
-                    fontWeight: 600,
-                  }}
+                  sx={{ bgcolor: "#e3f2fd", color: "#1976d2", fontWeight: 600 }}
+                />
+                <Chip
+                  label={event.eligibility || "Open to All"}
+                  size="small"
+                  variant="outlined"
                 />
               </Box>
 
-              {/* Status */}
-              <Chip
-                label={event.status}
-                size="small"
-                color={
-                  event.status === "PUBLISHED"
-                    ? "success"
-                    : event.status === "DRAFT"
-                    ? "default"
-                    : event.status === "ONGOING"
-                    ? "warning"
-                    : "error"
-                }
-                variant="outlined"
-                sx={{ fontWeight: 600, mb: 3 }}
-              />
-
-              <Divider sx={{ mb: 3 }} />
-
-              {/* Description */}
-              {event.description && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 1 }}>
-                    Description
-                  </Typography>
-                  <Typography variant="body1" sx={{ color: "#555", lineHeight: 1.7 }}>
-                    {event.description}
-                  </Typography>
-                </Box>
-              )}
-
-              {/* Details Grid */}
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}>
-                  Event Details
-                </Typography>
-
-                <Grid container spacing={2}>
-                  {/* Dates */}
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                      <CalendarTodayIcon sx={{ color: "#673ab7", mt: 0.3, fontSize: "1.2rem" }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#888" }}>
-                          Start Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: "#333" }}>
-                          {formatDate(event.startDate)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                      <CalendarTodayIcon sx={{ color: "#673ab7", mt: 0.3, fontSize: "1.2rem" }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#888" }}>
-                          End Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: "#333" }}>
-                          {formatDate(event.endDate)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  {/* Deadline */}
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                      <AccessTimeIcon sx={{ color: isDeadlinePassed ? "#d32f2f" : "#673ab7", mt: 0.3, fontSize: "1.2rem" }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#888" }}>
-                          Registration Deadline
-                        </Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            fontWeight: 600,
-                            color: isDeadlinePassed ? "#d32f2f" : "#333",
-                          }}
-                        >
-                          {formatDate(event.registrationDeadline)}
-                          {isDeadlinePassed && " (Passed)"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  {/* Eligibility */}
-                  {event.eligibility && (
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                        <CategoryIcon sx={{ color: "#673ab7", mt: 0.3, fontSize: "1.2rem" }} />
-                        <Box>
-                          <Typography variant="body2" sx={{ color: "#888" }}>
-                            Eligibility
-                          </Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600, color: "#333" }}>
-                            {event.eligibility}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Grid>
-                  )}
-
-                  {/* Fee */}
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                      <AttachMoneyIcon sx={{ color: "#673ab7", mt: 0.3, fontSize: "1.2rem" }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#888" }}>
-                          {isMerch ? "Price" : "Registration Fee"}
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: "#333" }}>
-                          {event.registrationFee ? `₹${event.registrationFee}` : "Free"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  {/* Registrations / Stock */}
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                      <GroupIcon sx={{ color: "#673ab7", mt: 0.3, fontSize: "1.2rem" }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#888" }}>
-                          {isMerch ? "Stock Remaining" : "Registrations"}
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: "#333" }}>
-                          {isMerch
-                            ? event.stock !== undefined
-                              ? `${event.stock} left`
-                              : "Unlimited"
-                            : `${stats.totalRegs}${event.registrationLimit ? ` / ${event.registrationLimit}` : ""}`}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
-
-              {/* Merch Variants */}
-              {isMerch && event.variants && event.variants.length > 0 && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 1 }}>
-                    Available Variants
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    {event.variants.map((v, idx) => (
-                      <Chip
-                        key={idx}
-                        label={`${v.size || ""}${v.color ? ` - ${v.color}` : ""}${v.price ? ` (₹${v.price})` : ""}`}
-                        variant="outlined"
-                        sx={{ borderColor: "#673ab7", color: "#673ab7" }}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-
-              {/* Tags */}
-              {event.tags && event.tags.length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 1 }}>
-                    Tags
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    {event.tags.map((tag, idx) => (
-                      <Chip
-                        key={idx}
-                        label={tag}
-                        size="small"
-                        sx={{ bgcolor: "#f0f2f5", color: "#555" }}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-            </Paper>
-          </Grid>
-
-          {/* Right Column — Registration Card */}
-          <Grid item xs={12} md={4}>
-            {/* Organizer Card */}
-            {event.organizerId && (
-              <Paper
-                elevation={0}
-                sx={{
-                  border: "1px solid #e0e0e0",
-                  borderRadius: 3,
-                  p: 3,
-                  mb: 3,
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 1.5 }}>
-                  Organized by
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                  <PersonIcon sx={{ color: "#673ab7" }} />
-                  <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 600, color: "#333" }}>
-                      {event.organizerId.name}
-                    </Typography>
-                    {event.organizerId.category && (
-                      <Typography variant="body2" sx={{ color: "#888" }}>
-                        {event.organizerId.category}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-                {event.organizerId.description && (
-                  <Typography variant="body2" sx={{ color: "#666", mt: 1.5 }}>
-                    {event.organizerId.description}
-                  </Typography>
-                )}
-                {event.organizerId.contactEmail && (
-                  <Typography variant="body2" sx={{ color: "#888", mt: 1 }}>
-                    Contact: {event.organizerId.contactEmail}
-                  </Typography>
-                )}
-              </Paper>
-            )}
-
-            {/* Registration Action Card */}
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 3,
-                p: 3,
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}>
-                {isMerch ? "Purchase" : "Registration"}
+              <Typography variant="body1" sx={{ color: "#666", mb: 2 }}>
+                Organized by{" "}
+                <strong>{event.organizerId?.name || "Unknown"}</strong>
               </Typography>
+            </Box>
 
-              {/* Price highlight */}
-              <Box
-                sx={{
-                  bgcolor: "#f3e8ff",
-                  borderRadius: 2,
-                  p: 2,
-                  textAlign: "center",
-                  mb: 2,
-                }}
-              >
-                <Typography variant="body2" sx={{ color: "#673ab7", mb: 0.5 }}>
-                  {isMerch ? "Price" : "Registration Fee"}
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: "#673ab7" }}>
-                  {event.registrationFee ? `₹${event.registrationFee}` : "Free"}
-                </Typography>
-              </Box>
-
-              {/* Quick Stats */}
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                  <Typography variant="body2" sx={{ color: "#888" }}>
-                    {isMerch ? "Stock" : "Spots"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: "#333" }}>
-                    {isMerch
-                      ? event.stock !== undefined
-                        ? `${event.stock} remaining`
-                        : "Unlimited"
-                      : event.registrationLimit
-                      ? `${event.registrationLimit - stats.totalRegs} remaining`
-                      : "Unlimited"}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                  <Typography variant="body2" sx={{ color: "#888" }}>
-                    Deadline
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 600,
-                      color: isDeadlinePassed ? "#d32f2f" : "#333",
-                    }}
-                  >
-                    {formatShortDate(event.registrationDeadline)}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                  <Typography variant="body2" sx={{ color: "#888" }}>
-                    {isMerch ? "Total Purchases" : "Total Registrations"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: "#333" }}>
-                    {stats.totalRegs}
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Blocking Alerts */}
-              {registrationBlocked && (
-                <Alert
-                  severity="warning"
-                  sx={{ mb: 2, borderRadius: 2, fontSize: "0.85rem" }}
-                >
-                  {getBlockReason()}
-                </Alert>
-              )}
-
-              {/* Blocking Chips */}
-              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
-                {isDeadlinePassed && (
-                  <Chip label="Deadline Passed" color="error" size="small" sx={{ fontWeight: 600 }} />
-                )}
-                {isLimitReached && (
-                  <Chip
-                    label={isMerch ? "Out of Stock" : "Limit Reached"}
-                    color="error"
-                    size="small"
-                    sx={{ fontWeight: 600 }}
-                  />
-                )}
-                {isOutOfStock && !isLimitReached && (
-                  <Chip label="Out of Stock" color="error" size="small" sx={{ fontWeight: 600 }} />
-                )}
-              </Box>
-
-              {/* Register / Purchase Button */}
+            {canRegister && (
               <Button
                 variant="contained"
-                fullWidth
-                disabled={registrationBlocked || registering}
-                onClick={handleRegister}
+                size="large"
+                onClick={() => setRegisterDialog(true)}
                 sx={{
-                  py: 1.3,
                   textTransform: "none",
-                  fontSize: "1rem",
                   fontWeight: 600,
+                  bgcolor: "#673ab7",
                   borderRadius: 2,
-                  bgcolor: registrationBlocked ? undefined : "#673ab7",
-                  "&:hover": {
-                    bgcolor: "#5e35b1",
-                  },
+                  px: 4,
+                  "&:hover": { bgcolor: "#5e35b1" },
                 }}
               >
-                {registering
-                  ? "Processing..."
-                  : registrationBlocked
-                  ? isMerch
-                    ? "Purchase Unavailable"
-                    : "Registration Closed"
-                  : isMerch
-                  ? "Purchase Now"
-                  : "Register Now"}
+                Register Now
               </Button>
-            </Paper>
+            )}
+
+            {isDeadlinePassed && (
+              <Chip
+                label="Registration Closed"
+                color="error"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
+
+            {isLimitReached && !isDeadlinePassed && (
+              <Chip
+                label="Seats Full"
+                color="warning"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
+          </Box>
+
+          {/* Event Info Grid */}
+          <Grid container spacing={3} sx={{ mt: 2 }}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <CalendarTodayIcon sx={{ color: "#673ab7", mr: 1 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: "#888" }}>
+                    Start Date
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {new Date(event.startDate).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <CalendarTodayIcon sx={{ color: "#673ab7", mr: 1 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: "#888" }}>
+                    End Date
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {new Date(event.endDate).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <LocationOnIcon sx={{ color: "#673ab7", mr: 1 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: "#888" }}>
+                    Venue
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {event.venue || "TBA"}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <AttachMoneyIcon sx={{ color: "#673ab7", mr: 1 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: "#888" }}>
+                    Registration Fee
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {event.registrationFee > 0
+                      ? `₹${event.registrationFee}`
+                      : "Free"}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <PeopleIcon sx={{ color: "#673ab7", mr: 1 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: "#888" }}>
+                    Registrations
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {stats?.totalRegs || 0}
+                    {event.registrationLimit
+                      ? ` / ${event.registrationLimit}`
+                      : ""}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <CalendarTodayIcon sx={{ color: "#673ab7", mr: 1 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: "#888" }}>
+                    Registration Deadline
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {new Date(event.registrationDeadline).toLocaleDateString(
+                      "en-US",
+                      {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      }
+                    )}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
           </Grid>
-        </Grid>
+        </Paper>
+
+        {/* Description */}
+        <Paper
+          elevation={0}
+          sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}
+        >
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}
+          >
+            About this Event
+          </Typography>
+          <Typography variant="body1" sx={{ color: "#666", lineHeight: 1.8 }}>
+            {event.description || "No description available."}
+          </Typography>
+        </Paper>
+
+        {/* Organizer Info */}
+        {event.organizerId && (
+          <Paper
+            elevation={0}
+            sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4 }}
+          >
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}
+            >
+              Organized By
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+              {event.organizerId.name}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+              {event.organizerId.category}
+            </Typography>
+            {event.organizerId.description && (
+              <Typography variant="body2" sx={{ color: "#666" }}>
+                {event.organizerId.description}
+              </Typography>
+            )}
+          </Paper>
+        )}
+
+        {/* Registration Dialog */}
+        <Dialog
+          open={registerDialog}
+          onClose={() => setRegisterDialog(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            Register for {event.name}
+          </DialogTitle>
+          <DialogContent>
+            {success && (
+              <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                {success}
+              </Alert>
+            )}
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+              Please fill in all required fields to complete your registration.
+            </Alert>
+
+            {event.customFields && event.customFields.length > 0 ? (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {event.customFields.map((field, index) => (
+                  <Box key={index}>{renderCustomField(field)}</Box>
+                ))}
+              </Box>
+            ) : (
+              <Typography sx={{ color: "#666", textAlign: "center", py: 2 }}>
+                No additional information required. Click register to confirm.
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={() => setRegisterDialog(false)}
+              disabled={registering}
+              sx={{ textTransform: "none", color: "#666" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRegister}
+              variant="contained"
+              disabled={registering}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                bgcolor: "#673ab7",
+                "&:hover": { bgcolor: "#5e35b1" },
+              }}
+            >
+              {registering ? <CircularProgress size={24} /> : "Register"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );

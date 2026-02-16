@@ -243,7 +243,7 @@ const BrowseEvents = () => {
                   elevation={0}
                   sx={{
                     border: "1px solid #e0e0e0",
-                    borderRadius: 2,
+                    borderRadius: 3,
                     cursor: "pointer",
                     height: "100%",
                     "&:hover": { borderColor: "#673ab7" },

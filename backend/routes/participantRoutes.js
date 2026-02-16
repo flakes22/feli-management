@@ -1,46 +1,27 @@
 import express from "express";
+import { protect, authorize } from "../middleware/authMiddleware.js";
 import {
   browseEvents,
-  trendingEvents,
   getEventDetails,
-  registerForEvent,
-  getMyRegistrations,
-  cancelRegistration,
-  getAllClubs,
+  getTrendingEvents,
+  getClubs,
   getClubDetails,
-  followOrganizer,
-  unfollowOrganizer,
-  getMyProfile,
-  updateMyProfile,
+  toggleFollow,
+  getProfile,
+  updateProfile,
   changePassword,
 } from "../controllers/participantController.js";
 
-import {
-  protect,
-  authorize,
-} from "../middleware/authMiddleware.js";
-
 const router = express.Router();
 
-// Browse and trending events
 router.get("/browse", protect, authorize("participant"), browseEvents);
-router.get("/trending", protect, authorize("participant"), trendingEvents);
-
-// Event details and registration
+router.get("/trending", protect, authorize("participant"), getTrendingEvents);
 router.get("/event/:eventId", protect, authorize("participant"), getEventDetails);
-router.post("/register/:eventId", protect, authorize("participant"), registerForEvent);
-router.get("/registrations", protect, authorize("participant"), getMyRegistrations);
-router.patch("/cancel/:registrationId", protect, authorize("participant"), cancelRegistration);
-
-// Clubs/Organizers
-router.get("/clubs", protect, authorize("participant"), getAllClubs);
+router.get("/clubs", protect, authorize("participant"), getClubs);
 router.get("/club/:organizerId", protect, authorize("participant"), getClubDetails);
-router.post("/follow/:organizerId", protect, authorize("participant"), followOrganizer);
-router.delete("/unfollow/:organizerId", protect, authorize("participant"), unfollowOrganizer);
-
-// Profile management
-router.get("/profile", protect, authorize("participant"), getMyProfile);
-router.put("/profile", protect, authorize("participant"), updateMyProfile);
+router.post("/follow/:organizerId", protect, authorize("participant"), toggleFollow);
+router.get("/profile", protect, authorize("participant"), getProfile);
+router.put("/profile", protect, authorize("participant"), updateProfile);
 router.put("/change-password", protect, authorize("participant"), changePassword);
 
 export default router;
