@@ -11,8 +11,6 @@ import registrationRoutes from "./routes/registrationRoutes.js";
 import organizerEventRoutes from "./routes/organizerEventRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 
-app.use("/api/registration", registrationRoutes);
-
 
 dotenv.config();
 
@@ -23,17 +21,24 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/registration", registrationRoutes);
+
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/organizer", organizerEventRoutes);
-
+app.use("/api/organizer/event", organizerEventRoutes); // Must come BEFORE /api/organizer
 app.use("/api/organizer", organizerRoutes);
 app.use("/api/participant", participantRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
 app.get("/", (req, res) => {
-    res.send("Felicity Event Management Backend Running");
+    res.json({ message: "Felicity Event Management API is running" });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong!" });
 });
 
 app.listen(PORT,()=>{

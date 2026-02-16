@@ -4,6 +4,10 @@ import {
   publishEvent,
   editEvent,
   getMyEvents,
+  getDashboard,
+  getProfile,
+  updateProfile,
+  requestPasswordReset,
 } from "../controllers/organizerController.js";
 
 import {
@@ -40,5 +44,10 @@ router.get(
   authorize("organizer"),
   getMyEvents
 );
+
+router.get("/dashboard", protect, authorize("organizer"), getDashboard);
+router.get("/profile", protect, authorize("organizer"), getProfile);
+router.put("/profile", protect, authorize("organizer"), updateProfile);
+router.post("/request-password-reset", protect, authorize("organizer"), requestPasswordReset);
 
 export default router;
