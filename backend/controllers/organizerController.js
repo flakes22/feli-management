@@ -100,17 +100,6 @@ export const editEvent = async (req, res) => {
 
 // Get My events
 
-export const getMyEvents = async (req, res) => {
-    try {
-      const events = await Event.find({
-        organizerId: req.user.id,
-      });
-  
-      res.json(events);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  };
 
 export const getDashboard = async (req, res) => {
   try {
@@ -292,5 +281,154 @@ export const requestPasswordReset = async (req, res) => {
   } catch (err) {
     console.error("requestPasswordReset error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// Get all events for this organizer (for dashboard carousel)
+export const getMyEvents = async (req, res) => {
+  try {
+    const organizerId = req.user.id;
+    const events = await Event.find({ organizerId }).sort({ createdAt: -1 });
+    res.json(events);
+  } catch (error) {
+    console.error("getMyEvents error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get organizer profile
+export const getOrganizerProfile = async (req, res) => {
+  try {
+    const organizerId = req.user.id;
+
+    const organizer = await Organizer.findById(organizerId).select("-password");
+
+    if (!organizer) {
+      return res.status(404).json({ message: "Organizer not found" });
+    }
+
+    // Calculate stats
+    const allEvents = await Event.find({ organizerId });
+    const now = new Date();
+
+    const totalEvents = allEvents.length;
+    const upcomingEvents = allEvents.filter(
+      (e) => new Date(e.startDate) > now && e.status === "PUBLISHED"
+    ).length;
+    const completedEvents = allEvents.filter(
+      (e) => new Date(e.endDate) < now
+    ).length;
+
+    const eventIds = allEvents.map((e) => e._id);
+    const totalParticipants = await Registration.countDocuments({
+      eventId: { $in: eventIds },
+      status: { $ne: "CANCELLED" },
+    });
+
+    const followers = organizer.followers?.length || 0;
+
+    // Return BOTH organizer and stats nested properly
+    res.json({
+      organizer,
+      stats: {
+        totalEvents,
+        upcomingEvents,
+        completedEvents,
+        totalParticipants,
+        followers,
+      },
+    });
+  } catch (error) {
+    console.error("getOrganizerProfile error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update organizer profile
+export const updateOrganizerProfile = async (req, res) => {
+  try {
+    const { name, description, category, contactEmail } = req.body;
+
+    const organizer = await Organizer.findByIdAndUpdate(
+      req.user.id,
+      { name, description, category, contactEmail },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!organizer) {
+      return res.status(404).json({ message: "Organizer not found" });
+    }
+
+    res.json({ message: "Profile updated successfully", organizer });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Change password
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
+    }
+
+    const organizer = await Organizer.findById(req.user.id);
+    if (!organizer) {
+      return res.status(404).json({ message: "Organizer not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, organizer.password);
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ message: "Current password is incorrect" });
+    }
+
+    organizer.password = await bcrypt.hash(newPassword, 10);
+    await organizer.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get organizer stats
+export const getOrganizerStats = async (req, res) => {
+  try {
+    const organizerId = req.user.id;
+
+    const events = await Event.find({ organizerId });
+    const eventIds = events.map((e) => e._id);
+
+    const registrations = await Registration.find({
+      eventId: { $in: eventIds },
+      status: { $ne: "CANCELLED" },
+    });
+
+    const totalRevenue = events.reduce((sum, evt) => {
+      const count = registrations.filter(
+        (r) => r.eventId.toString() === evt._id.toString()
+      ).length;
+      return sum + count * (evt.registrationFee || 0);
+    }, 0);
+
+    res.json({
+      totalEvents: events.length,
+      publishedEvents: events.filter((e) => e.status === "PUBLISHED").length,
+      totalRegistrations: registrations.length,
+      totalRevenue,
+    });
+  } catch (error) {
+    res.status (500).json({ message: error.message });
   }
 };

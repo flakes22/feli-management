@@ -1,53 +1,42 @@
 import express from "express";
 import {
   createEvent,
-  publishEvent,
-  editEvent,
-  getMyEvents,
-  getDashboard,
-  getProfile,
-  updateProfile,
-  requestPasswordReset,
-} from "../controllers/organizerController.js";
+  updateEvent,
+  deleteEvent,
+  getEventDetail,
+  getOngoingEvents,
+  getParticipants,
+  exportParticipantsCSV,
+} from "../controllers/organizerEventController.js";
 
 import {
-  protect,
-  authorize,
-} from "../middleware/authMiddleware.js";
+  getMyEvents,
+  getOrganizerProfile,
+  updateOrganizerProfile,
+  changePassword,
+  getOrganizerStats,
+} from "../controllers/organizerController.js";
+
+import { protect, authorize } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post(
-  "/create-event",
-  protect,
-  authorize("organizer"),
-  createEvent
-);
+// ── Event Management ──
+router.post("/events", protect, authorize("organizer"), createEvent);
+router.get("/events", protect, authorize("organizer"), getMyEvents);
+router.get("/events/ongoing", protect, authorize("organizer"), getOngoingEvents);
+router.get("/events/:eventId", protect, authorize("organizer"), getEventDetail);
+router.put("/events/:eventId", protect, authorize("organizer"), updateEvent);
+router.delete("/events/:eventId", protect, authorize("organizer"), deleteEvent);
 
-router.patch(
-  "/publish-event/:id",
-  protect,
-  authorize("organizer"),
-  publishEvent
-);
+// ── Participants ──
+router.get("/events/:eventId/participants", protect, authorize("organizer"), getParticipants);
+router.get("/events/:eventId/export", protect, authorize("organizer"), exportParticipantsCSV);
 
-router.patch(
-  "/edit-event/:id",
-  protect,
-  authorize("organizer"),
-  editEvent
-);
-
-router.get(
-  "/my-events",
-  protect,
-  authorize("organizer"),
-  getMyEvents
-);
-
-router.get("/dashboard", protect, authorize("organizer"), getDashboard);
-router.get("/profile", protect, authorize("organizer"), getProfile);
-router.put("/profile", protect, authorize("organizer"), updateProfile);
-router.post("/request-password-reset", protect, authorize("organizer"), requestPasswordReset);
+// ── Profile ──
+router.get("/profile", protect, authorize("organizer"), getOrganizerProfile);
+router.put("/profile", protect, authorize("organizer"), updateOrganizerProfile);
+router.put("/change-password", protect, authorize("organizer"), changePassword);
+router.get("/stats", protect, authorize("organizer"), getOrganizerStats);
 
 export default router;

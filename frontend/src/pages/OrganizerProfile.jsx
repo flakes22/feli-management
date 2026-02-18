@@ -45,18 +45,23 @@ const OrganizerProfile = () => {
   const fetchProfile = async () => {
     try {
       const res = await API.get("/organizer/profile");
-      setProfile(res.data.organizer);
-      setStats(res.data.stats);
+
+      // API returns organizer directly, not nested under res.data.organizer
+      const organizer = res.data.organizer || res.data;
+      const stats = res.data.stats || null;
+
+      setProfile(organizer);
+      setStats(stats);
 
       // Initialize editable fields
-      setDescription(res.data.organizer.description || "");
-      setEstablishedYear(res.data.organizer.establishedYear || "");
-      setMemberCount(res.data.organizer.memberCount || "");
-      setContactPhone(res.data.organizer.contactPhone || "");
-      setWebsite(res.data.organizer.website || "");
-      setTwitter(res.data.organizer.socialMedia?.twitter || "");
-      setInstagram(res.data.organizer.socialMedia?.instagram || "");
-      setLinkedin(res.data.organizer.socialMedia?.linkedin || "");
+      setDescription(organizer.description || "");
+      setEstablishedYear(organizer.establishedYear || "");
+      setMemberCount(organizer.memberCount || "");
+      setContactPhone(organizer.contactPhone || "");
+      setWebsite(organizer.website || "");
+      setTwitter(organizer.socialMedia?.twitter || "");
+      setInstagram(organizer.socialMedia?.instagram || "");
+      setLinkedin(organizer.socialMedia?.linkedin || "");
     } catch (err) {
       setError("Failed to load profile");
     } finally {
