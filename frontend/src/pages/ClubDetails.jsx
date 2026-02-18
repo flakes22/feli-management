@@ -10,7 +10,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
   Alert,
   CircularProgress,
 } from "@mui/material";
@@ -25,15 +24,32 @@ const ClubDetails = () => {
   const navigate = useNavigate();
 
   const [club, setClub] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const fetchClubDetails = async () => {
     try {
+      setLoading(true);
+
       const res = await API.get(`/participant/club/${organizerId}`);
-      setClub(res.data);
+
+      // Backend response structure:
+      // { club: {...}, events: [...], stats: {...} }
+
+      setClub(res.data.club);
+      setEvents(res.data.events || []);
+      setStats(res.data.stats || {});
+
+      // If backend later adds isFollowing, this will support it
+      if (res.data.isFollowing !== undefined) {
+        setIsFollowing(res.data.isFollowing);
+      }
+
     } catch (err) {
-      setError("Failed to load club details");
+      setError(err.response?.data?.message || "Failed to load club details");
     } finally {
       setLoading(false);
     }
@@ -45,11 +61,12 @@ const ClubDetails = () => {
 
   const handleFollow = async () => {
     try {
-      await API.post(`/participant/follow/${organizerId}`);
-      setClub((prev) => ({
-        ...prev,
-        isFollowing: !prev.isFollowing,
-      }));
+      const res = await API.post(`/participant/follow/${organizerId}`);
+
+      // Backend returns:
+      // { message: "...", isFollowing: true/false }
+
+      setIsFollowing(res.data.isFollowing);
     } catch (err) {
       console.error("Follow toggle failed:", err);
     }
@@ -68,7 +85,14 @@ const ClubDetails = () => {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
         <ParticipantNavbar />
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: "60vh",
+          }}
+        >
           <CircularProgress sx={{ color: "#673ab7" }} />
         </Box>
       </Box>
@@ -94,9 +118,6 @@ const ClubDetails = () => {
     );
   }
 
-  const organizer = club.organizer || club;
-  const events = club.events || [];
-
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
       <ParticipantNavbar />
@@ -117,7 +138,7 @@ const ClubDetails = () => {
           ← Back to Clubs
         </Button>
 
-        {/* Club Header Card */}
+        {/* Club Header */}
         <Paper
           elevation={0}
           sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}
@@ -130,13 +151,16 @@ const ClubDetails = () => {
             }}
           >
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 0.5 }}>
-                {organizer.name}
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 700, color: "#1a1a2e", mb: 0.5 }}
+              >
+                {club.name}
               </Typography>
 
-              {organizer.category && (
+              {club.category && (
                 <Chip
-                  label={organizer.category}
+                  label={club.category}
                   size="small"
                   variant="outlined"
                   sx={{
@@ -149,29 +173,29 @@ const ClubDetails = () => {
                 />
               )}
 
-              {organizer.description && (
+              {club.description && (
                 <Typography
                   variant="body1"
                   sx={{ color: "#555", lineHeight: 1.7, mt: 1, maxWidth: 600 }}
                 >
-                  {organizer.description}
+                  {club.description}
                 </Typography>
               )}
 
               <Box sx={{ display: "flex", gap: 3, mt: 2 }}>
-                {organizer.contactEmail && (
+                {club.contactEmail && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <EmailIcon sx={{ fontSize: "1rem", color: "#888" }} />
                     <Typography variant="body2" sx={{ color: "#888" }}>
-                      {organizer.contactEmail}
+                      {club.contactEmail}
                     </Typography>
                   </Box>
                 )}
-                {organizer.contactPhone && (
+                {club.contactPhone && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <PersonIcon sx={{ fontSize: "1rem", color: "#888" }} />
                     <Typography variant="body2" sx={{ color: "#888" }}>
-                      {organizer.contactPhone}
+                      {club.contactPhone}
                     </Typography>
                   </Box>
                 )}
@@ -179,7 +203,7 @@ const ClubDetails = () => {
             </Box>
 
             <Button
-              variant={club.isFollowing ? "contained" : "outlined"}
+              variant={isFollowing ? "contained" : "outlined"}
               onClick={handleFollow}
               sx={{
                 textTransform: "none",
@@ -188,7 +212,7 @@ const ClubDetails = () => {
                 px: 3,
                 py: 1,
                 minWidth: 120,
-                ...(club.isFollowing
+                ...(isFollowing
                   ? {
                       bgcolor: "#00897b",
                       "&:hover": { bgcolor: "#00796b" },
@@ -203,14 +227,17 @@ const ClubDetails = () => {
                     }),
               }}
             >
-              {club.isFollowing ? "Following" : "Follow"}
+              {isFollowing ? "Following" : "Follow"}
             </Button>
           </Box>
         </Paper>
 
         {/* Events Section */}
-        <Typography variant="h5" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}>
-          Events by {organizer.name}
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}
+        >
+          Events by {club.name}
         </Typography>
 
         {events.length === 0 ? (
@@ -240,7 +267,9 @@ const ClubDetails = () => {
                     height: "100%",
                     "&:hover": { borderColor: "#673ab7" },
                   }}
-                  onClick={() => navigate(`/participant/event/${event._id}`)}
+                  onClick={() =>
+                    navigate(`/participant/event/${event._id}`)
+                  }
                 >
                   <CardContent sx={{ p: 3 }}>
                     <Typography
@@ -252,11 +281,21 @@ const ClubDetails = () => {
 
                     <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
                       <Chip
-                        label={event.type === "MERCH" ? "Merchandise" : "Event"}
+                        label={
+                          event.type === "MERCH"
+                            ? "Merchandise"
+                            : "Event"
+                        }
                         size="small"
                         sx={{
-                          bgcolor: event.type === "MERCH" ? "#fff3e0" : "#f3e8ff",
-                          color: event.type === "MERCH" ? "#e65100" : "#673ab7",
+                          bgcolor:
+                            event.type === "MERCH"
+                              ? "#fff3e0"
+                              : "#f3e8ff",
+                          color:
+                            event.type === "MERCH"
+                              ? "#e65100"
+                              : "#673ab7",
                           fontWeight: 600,
                           fontSize: "0.75rem",
                         }}
@@ -264,13 +303,6 @@ const ClubDetails = () => {
                       <Chip
                         label={event.status}
                         size="small"
-                        color={
-                          event.status === "PUBLISHED"
-                            ? "success"
-                            : event.status === "ONGOING"
-                            ? "warning"
-                            : "default"
-                        }
                         variant="outlined"
                         sx={{ fontWeight: 600, fontSize: "0.75rem" }}
                       />
@@ -299,10 +331,6 @@ const ClubDetails = () => {
                         borderColor: "#673ab7",
                         color: "#673ab7",
                         borderRadius: 2,
-                        "&:hover": {
-                          borderColor: "#5e35b1",
-                          bgcolor: "rgba(103, 58, 183, 0.04)",
-                        },
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
