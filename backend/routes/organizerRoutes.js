@@ -1,37 +1,27 @@
 import express from "express";
 import {
   createEvent,
-  updateEvent,
-  deleteEvent,
-  getEventDetail,
-  getOngoingEvents,
-  getParticipants,
-  exportParticipantsCSV,
-} from "../controllers/organizerEventController.js";
-
-import {
   getMyEvents,
+  getEventDetail,
+  updateEvent,
+  publishEvent,
+  deleteEvent,
   getOrganizerProfile,
   updateOrganizerProfile,
   changePassword,
   getOrganizerStats,
 } from "../controllers/organizerController.js";
-
 import { protect, authorize } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// ── Event Management ──
+// ── Events ──
 router.post("/events", protect, authorize("organizer"), createEvent);
 router.get("/events", protect, authorize("organizer"), getMyEvents);
-router.get("/events/ongoing", protect, authorize("organizer"), getOngoingEvents);
 router.get("/events/:eventId", protect, authorize("organizer"), getEventDetail);
 router.put("/events/:eventId", protect, authorize("organizer"), updateEvent);
+router.patch("/events/:eventId/publish", protect, authorize("organizer"), publishEvent);
 router.delete("/events/:eventId", protect, authorize("organizer"), deleteEvent);
-
-// ── Participants ──
-router.get("/events/:eventId/participants", protect, authorize("organizer"), getParticipants);
-router.get("/events/:eventId/export", protect, authorize("organizer"), exportParticipantsCSV);
 
 // ── Profile ──
 router.get("/profile", protect, authorize("organizer"), getOrganizerProfile);

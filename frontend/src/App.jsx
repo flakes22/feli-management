@@ -6,11 +6,10 @@ import Signup from "./pages/Signup";
 
 // Participant pages
 import ParticipantDashboard from "./pages/ParticipantDashboard";
-import ParticipantBrowse from "./pages/ParticipantBrowse";
-import ParticipantClubs from "./pages/ParticipantClubs";
 import ParticipantProfile from "./pages/ParticipantProfile";
 import EventDetails from "./pages/EventDetails";
-
+import BrowseEvents from "./pages/BrowseEvents";
+import ClubsOrganizers from "./pages/ClubsOrganizers";
 // Organizer pages
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import OrganizerEventDetail from "./pages/OrganizerEventDetail";
@@ -32,8 +31,8 @@ function App() {
 
         {/* Participant */}
         <Route path="/participant/dashboard" element={<ParticipantDashboard />} />
-        <Route path="/participant/browse" element={<ParticipantBrowse />} />
-        <Route path="/participant/clubs" element={<ParticipantClubs />} />
+        <Route path="/participant/browse" element={<BrowseEvents />} />
+        <Route path="/participant/clubs" element={<ClubsOrganizers />} />
         <Route path="/participant/profile" element={<ParticipantProfile />} />
         <Route path="/participant/event/:eventId" element={<EventDetails />} />
 
