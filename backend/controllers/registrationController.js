@@ -2,75 +2,53 @@ import Event from "../models/Event.js";
 import Participant from "../models/Participant.js";
 import Registration from "../models/Registration.js";
 import QRCode from "qrcode";
+import { sendTicketEmail } from "../utils/sendEmail.js";
 
-// Normal event registration
-
+// ── Normal Event Registration ──
 export const registerForEvent = async (req, res) => {
   try {
     const { eventId, customFieldResponses } = req.body;
     const participantId = req.user.id;
 
-    // Check if event exists
     const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
+    if (!event) return res.status(404).json({ message: "Event not found" });
 
-    // Check if event is published
-    if (event.status !== "PUBLISHED") {
+    if (event.status !== "PUBLISHED")
       return res.status(400).json({ message: "Event is not open for registration" });
-    }
 
-    // Check deadline
-    if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
+    if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date())
       return res.status(400).json({ message: "Registration deadline has passed" });
-    }
 
-    // Check registration limit
     const totalRegs = await Registration.countDocuments({
       eventId,
       status: { $ne: "CANCELLED" },
     });
-
-    if (event.registrationLimit && totalRegs >= event.registrationLimit) {
+    if (event.registrationLimit && totalRegs >= event.registrationLimit)
       return res.status(400).json({ message: "Registration limit reached" });
-    }
 
-    // Check if already registered
     const existing = await Registration.findOne({
       participantId,
       eventId,
       status: { $ne: "CANCELLED" },
     });
-
-    if (existing) {
+    if (existing)
       return res.status(400).json({ message: "Already registered for this event" });
-    }
 
     // Validate custom fields
     if (event.customFields && event.customFields.length > 0) {
       for (const field of event.customFields) {
         if (field.required) {
-          const response = customFieldResponses?.find(
-            (r) => r.fieldLabel === field.label
-          );
-          if (!response || !response.response) {
-            return res.status(400).json({
-              message: `${field.label} is required`,
-            });
-          }
+          const response = customFieldResponses?.find((r) => r.fieldLabel === field.label);
+          if (!response || !response.response)
+            return res.status(400).json({ message: `${field.label} is required` });
         }
       }
     }
 
-    // Generate ticket number
     const ticketNumber = `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-    // Generate QR code
     const qrData = JSON.stringify({ eventId, participantId, ticketNumber });
     const qrCode = await QRCode.toDataURL(qrData);
 
-    // Create registration
     const registration = new Registration({
       participantId,
       eventId,
@@ -79,15 +57,44 @@ export const registerForEvent = async (req, res) => {
       qrCode,
       customFieldResponses: customFieldResponses || [],
     });
-
     await registration.save();
 
-    // Update event registration count
     event.registrationCount = (event.registrationCount || 0) + 1;
     await event.save();
 
+    // ── Send ticket email (non-blocking — don't fail registration if email fails) ──
+    try {
+      const participant = await Participant.findById(participantId).select(
+        "firstName lastName email"
+      );
+
+      if (participant?.email) {
+        const eventDate = event.startDate
+          ? new Date(event.startDate).toLocaleDateString("en-IN", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
+          : "TBA";
+
+        await sendTicketEmail({
+          toEmail: participant.email,
+          participantName: `${participant.firstName} ${participant.lastName}`,
+          eventName: event.title || event.name,
+          eventDate,
+          eventVenue: event.venue || event.location || "",
+          ticketNumber,
+          qrCodeDataUrl: qrCode,
+        });
+      }
+    } catch (emailErr) {
+      // Log but do NOT fail the registration
+      console.error("Ticket email failed (registration still successful):", emailErr.message);
+    }
+
     res.status(201).json({
-      message: "Registration successful",
+      message: "Registration successful! A confirmation email with your ticket has been sent.",
       registration: {
         _id: registration._id,
         ticketNumber,
@@ -101,36 +108,29 @@ export const registerForEvent = async (req, res) => {
   }
 };
 
-// Merch Registration
+// ── Merch Purchase ──
 export const purchaseMerch = async (req, res) => {
   try {
     const { eventId, customFieldResponses } = req.body;
     const participantId = req.user.id;
 
     const event = await Event.findById(eventId);
-    if (!event || event.type !== "MERCH") {
+    if (!event || event.type !== "MERCH")
       return res.status(404).json({ message: "Merchandise not found" });
-    }
 
-    if (event.status !== "PUBLISHED") {
+    if (event.status !== "PUBLISHED")
       return res.status(400).json({ message: "Merchandise not available" });
-    }
 
-    // Check stock
-    if (event.stock !== undefined && event.stock <= 0) {
+    if (event.stock !== undefined && event.stock <= 0)
       return res.status(400).json({ message: "Out of stock" });
-    }
 
-    // Check if already purchased
     const existing = await Registration.findOne({
       participantId,
       eventId,
       status: { $ne: "CANCELLED" },
     });
-
-    if (existing) {
+    if (existing)
       return res.status(400).json({ message: "Already purchased this item" });
-    }
 
     const ticketNumber = `MERCH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     const qrData = JSON.stringify({ eventId, participantId, ticketNumber });
@@ -144,18 +144,35 @@ export const purchaseMerch = async (req, res) => {
       qrCode,
       customFieldResponses: customFieldResponses || [],
     });
-
     await registration.save();
 
-    // Decrement stock
-    if (event.stock !== undefined) {
-      event.stock -= 1;
-    }
+    if (event.stock !== undefined) event.stock -= 1;
     event.registrationCount = (event.registrationCount || 0) + 1;
     await event.save();
 
+    // ── Send purchase confirmation email ──
+    try {
+      const participant = await Participant.findById(participantId).select(
+        "firstName lastName email"
+      );
+
+      if (participant?.email) {
+        await sendTicketEmail({
+          toEmail: participant.email,
+          participantName: `${participant.firstName} ${participant.lastName}`,
+          eventName: event.title || event.name,
+          eventDate: "N/A (Merchandise)",
+          eventVenue: "",
+          ticketNumber,
+          qrCodeDataUrl: qrCode,
+        });
+      }
+    } catch (emailErr) {
+      console.error("Merch email failed (purchase still successful):", emailErr.message);
+    }
+
     res.status(201).json({
-      message: "Purchase successful",
+      message: "Purchase successful! A confirmation email has been sent.",
       registration: {
         _id: registration._id,
         ticketNumber,
@@ -169,8 +186,7 @@ export const purchaseMerch = async (req, res) => {
   }
 };
 
-// Participation History
-
+// ── Participation History (unchanged) ──
 export const getParticipantDashboard = async (req, res) => {
   try {
     const participantId = req.user.id;
@@ -202,38 +218,29 @@ export const getParticipantDashboard = async (req, res) => {
   }
 };
 
+// ── Cancel Registration (unchanged) ──
 export const cancelRegistration = async (req, res) => {
   try {
     const { registrationId } = req.params;
     const participantId = req.user.id;
 
-    const registration = await Registration.findOne({
-      _id: registrationId,
-      participantId,
-    });
-
-    if (!registration) {
+    const registration = await Registration.findOne({ _id: registrationId, participantId });
+    if (!registration)
       return res.status(404).json({ message: "Registration not found" });
-    }
 
-    if (registration.status === "CANCELLED") {
+    if (registration.status === "CANCELLED")
       return res.status(400).json({ message: "Already cancelled" });
-    }
 
-    if (registration.status === "ATTENDED") {
+    if (registration.status === "ATTENDED")
       return res.status(400).json({ message: "Cannot cancel after attendance" });
-    }
 
     registration.status = "CANCELLED";
     await registration.save();
 
-    // Update event count
     const event = await Event.findById(registration.eventId);
     if (event) {
       event.registrationCount = Math.max(0, (event.registrationCount || 1) - 1);
-      if (event.type === "MERCH" && event.stock !== undefined) {
-        event.stock += 1;
-      }
+      if (event.type === "MERCH" && event.stock !== undefined) event.stock += 1;
       await event.save();
     }
 
