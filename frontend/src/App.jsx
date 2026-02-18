@@ -10,6 +10,7 @@ import ParticipantProfile from "./pages/ParticipantProfile";
 import EventDetails from "./pages/EventDetails";
 import BrowseEvents from "./pages/BrowseEvents";
 import ClubsOrganizers from "./pages/ClubsOrganizers";
+import ClubDetails from "./pages/ClubDetails";
 // Organizer pages
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import OrganizerEventDetail from "./pages/OrganizerEventDetail";
@@ -19,6 +20,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import OrganizerProfile from "./pages/OrganizerProfile";
 import CreateEvent from "./pages/CreateEvent";
 import OngoingEvents from "./pages/OngoingEvents";
+import ManageOrganizers from "./pages/ManageOrganizers";
 
 function App() {
   return (
@@ -35,7 +37,7 @@ function App() {
         <Route path="/participant/clubs" element={<ClubsOrganizers />} />
         <Route path="/participant/profile" element={<ParticipantProfile />} />
         <Route path="/participant/event/:eventId" element={<EventDetails />} />
-
+        <Route path="/participant/club/:clubId" element={<ClubDetails />} />
         {/* Organizer */}
         <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
         <Route path="/organizer/event/:eventId" element={<OrganizerEventDetail />} />
@@ -44,6 +46,7 @@ function App() {
         <Route path="/organizer/ongoing" element={<OngoingEvents />}/>
         {/* Admin */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/manage-organizers" element={<ManageOrganizers />} />
       </Routes>
     </Router>
   );

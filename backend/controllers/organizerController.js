@@ -14,7 +14,7 @@ export const createEvent = async (req, res) => {
   }
 };
 
-// ── Get All Events for Organizer (Dashboard) ──
+// ── Get All Events for Organizer ──
 export const getMyEvents = async (req, res) => {
   try {
     const organizerId = req.user.id;
@@ -25,12 +25,11 @@ export const getMyEvents = async (req, res) => {
   }
 };
 
-// ── Get Single Event Detail with Registrations ──
+// ── Get Single Event Detail ──
 export const getEventDetail = async (req, res) => {
   try {
     const { eventId } = req.params;
     const organizerId = req.user.id;
-
     const event = await Event.findOne({ _id: eventId, organizerId });
     if (!event) return res.status(404).json({ message: "Event not found" });
 
@@ -44,7 +43,7 @@ export const getEventDetail = async (req, res) => {
   }
 };
 
-// ── Update Event with Status-based Rules ──
+// ── Update Event ──
 export const updateEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -55,71 +54,50 @@ export const updateEvent = async (req, res) => {
 
     const { status } = event;
 
-    // ONGOING / COMPLETED → only status change allowed
     if (status === "ONGOING" || status === "COMPLETED") {
       const { status: newStatus } = req.body;
       if (!newStatus)
         return res.status(400).json({ message: "Only status changes allowed for ongoing/completed events." });
-
       event.status = newStatus;
       await event.save();
       return res.json({ message: "Status updated", event });
     }
 
-    // PUBLISHED → restricted edits
     if (status === "PUBLISHED") {
       const { description, registrationDeadline, maxParticipants, status: newStatus } = req.body;
-
       if (newStatus) event.status = newStatus;
       if (description !== undefined) event.description = description;
-
-      // Can only EXTEND deadline
       if (registrationDeadline) {
-        if (new Date(registrationDeadline) < new Date(event.registrationDeadline)) {
-          return res.status(400).json({ message: "Cannot shorten registration deadline for a published event." });
-        }
+        if (new Date(registrationDeadline) < new Date(event.registrationDeadline))
+          return res.status(400).json({ message: "Cannot shorten registration deadline." });
         event.registrationDeadline = registrationDeadline;
       }
-
-      // Can only INCREASE limit
       if (maxParticipants !== undefined) {
-        if (Number(maxParticipants) < (event.maxParticipants || 0)) {
-          return res.status(400).json({ message: "Cannot decrease participant limit for a published event." });
-        }
+        if (Number(maxParticipants) < (event.maxParticipants || 0))
+          return res.status(400).json({ message: "Cannot decrease participant limit." });
         event.maxParticipants = Number(maxParticipants);
       }
-
       await event.save();
       return res.json({ message: "Event updated", event });
     }
 
-    // DRAFT → free edits, check if form is locked
     if (status === "DRAFT") {
       const hasRegistrations = await Registration.countDocuments({
-        eventId,
-        status: { $ne: "CANCELLED" },
+        eventId, status: { $ne: "CANCELLED" },
       });
-
-      // Lock customFields if registrations exist
       const { customFields, ...otherUpdates } = req.body;
       Object.assign(event, otherUpdates);
-
       if (customFields !== undefined) {
-        if (hasRegistrations > 0) {
-          return res.status(400).json({
-            message: "Cannot modify form fields after registrations are received.",
-          });
-        }
+        if (hasRegistrations > 0)
+          return res.status(400).json({ message: "Cannot modify form fields after registrations received." });
         event.customFields = customFields;
       }
-
       await event.save();
       return res.json({ message: "Event updated", event });
     }
 
     res.status(400).json({ message: "Cannot edit this event." });
   } catch (error) {
-    console.error("updateEvent error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -129,12 +107,10 @@ export const publishEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
     const organizerId = req.user.id;
-
     const event = await Event.findOne({ _id: eventId, organizerId });
     if (!event) return res.status(404).json({ message: "Event not found" });
     if (event.status !== "DRAFT")
       return res.status(400).json({ message: "Only draft events can be published." });
-
     event.status = "PUBLISHED";
     await event.save();
     res.json({ message: "Event published successfully", event });
@@ -143,30 +119,28 @@ export const publishEvent = async (req, res) => {
   }
 };
 
-// ── Delete Event (Draft only) ──
+// ── Delete Event ──
 export const deleteEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
     const organizerId = req.user.id;
-
     const event = await Event.findOne({ _id: eventId, organizerId });
     if (!event) return res.status(404).json({ message: "Event not found" });
     if (event.status !== "DRAFT")
       return res.status(400).json({ message: "Only draft events can be deleted." });
-
     await Event.deleteOne({ _id: eventId });
     await Registration.deleteMany({ eventId });
-
     res.json({ message: "Event deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// ── Organizer Profile ──
+// ── Get Organizer Profile ──
 export const getOrganizerProfile = async (req, res) => {
   try {
-    const organizer = await Organizer.findById(req.user.id).select("-password");
+    const organizer = await Organizer.findById(req.user.id)
+      .select("-password -passwordResetRequests");
     if (!organizer) return res.status(404).json({ message: "Organizer not found" });
 
     const allEvents = await Event.find({ organizerId: req.user.id });
@@ -182,7 +156,9 @@ export const getOrganizerProfile = async (req, res) => {
       organizer,
       stats: {
         totalEvents: allEvents.length,
-        upcomingEvents: allEvents.filter((e) => new Date(e.startDate) > now && e.status === "PUBLISHED").length,
+        upcomingEvents: allEvents.filter(
+          (e) => new Date(e.startDate) > now && e.status === "PUBLISHED"
+        ).length,
         completedEvents: allEvents.filter((e) => new Date(e.endDate) < now).length,
         totalParticipants,
         followers: organizer.followers?.length || 0,
@@ -193,9 +169,13 @@ export const getOrganizerProfile = async (req, res) => {
   }
 };
 
+// ── Update Organizer Profile ──
 export const updateOrganizerProfile = async (req, res) => {
   try {
-    const { description, establishedYear, memberCount, contactPhone, website, socialMedia } = req.body;
+    const {
+      description, establishedYear, memberCount,
+      contactPhone, website, socialMedia,
+    } = req.body;
     const organizer = await Organizer.findByIdAndUpdate(
       req.user.id,
       { description, establishedYear, memberCount, contactPhone, website, socialMedia },
@@ -208,31 +188,147 @@ export const updateOrganizerProfile = async (req, res) => {
   }
 };
 
-export const changePassword = async (req, res) => {
+// ── Request Password Reset ──
+export const requestPasswordReset = async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { reason, currentPassword, newPassword } = req.body;
+
+    if (!reason?.trim())
+      return res.status(400).json({ message: "Reason is required." });
+    if (!currentPassword)
+      return res.status(400).json({ message: "Current password is required." });
+    if (!newPassword || newPassword.length < 6)
+      return res.status(400).json({ message: "New password must be at least 6 characters." });
+
+    // ✅ Use findById — do NOT call .save() on this doc yet
     const organizer = await Organizer.findById(req.user.id);
+    if (!organizer) return res.status(404).json({ message: "Organizer not found." });
+
+    // ✅ Check if organizer is active
+    if (organizer.isActive === false)
+      return res.status(403).json({ message: "Your account has been disabled." });
+
+    // ✅ Verify current password against stored hash
     const isMatch = await bcrypt.compare(currentPassword, organizer.password);
-    if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
-    organizer.password = await bcrypt.hash(newPassword, 10);
-    await organizer.save();
-    res.json({ message: "Password changed successfully" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Current password is incorrect." });
+
+    // Check no PENDING request already exists
+    const hasPending = organizer.passwordResetRequests.some(
+      (r) => r.status === "PENDING"
+    );
+    if (hasPending)
+      return res.status(400).json({
+        message: "You already have a pending password reset request.",
+      });
+
+    // ✅ Hash the new password here (plain text → hash stored in request)
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // ✅ Use $push with updateOne to avoid triggering pre('save') on password field
+    await Organizer.updateOne(
+      { _id: req.user.id },
+      {
+        $push: {
+          passwordResetRequests: {
+            reason,
+            newPasswordHash,
+            status: "PENDING",
+            appliedByOrganizer: false,
+            requestedAt: new Date(),
+          },
+        },
+      }
+    );
+
+    res.json({
+      message: "Password reset request submitted. Admin will review it.",
+    });
+  } catch (error) {
+    console.error("requestPasswordReset error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ── Get Password Reset Status for this organizer ──
+export const getMyPasswordResetStatus = async (req, res) => {
+  try {
+    const organizer = await Organizer.findById(req.user.id).select(
+      "passwordResetRequests"
+    );
+    if (!organizer) return res.status(404).json({ message: "Organizer not found." });
+
+    // Return the latest request that hasn't been fully applied
+    const activeRequest = organizer.passwordResetRequests
+      .filter((r) => !r.appliedByOrganizer)
+      .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))[0] || null;
+
+    res.json({ request: activeRequest });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// ── Apply Approved Password ──
+export const applyApprovedPassword = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+
+    const organizer = await Organizer.findById(req.user.id);
+    if (!organizer) return res.status(404).json({ message: "Organizer not found." });
+
+    const request = organizer.passwordResetRequests.id(requestId);
+    if (!request) return res.status(404).json({ message: "Request not found." });
+    if (request.status !== "APPROVED")
+      return res.status(400).json({ message: "This request has not been approved yet." });
+    if (request.appliedByOrganizer)
+      return res.status(400).json({ message: "Password already applied." });
+
+    // ✅ Use updateOne to set the new (already-hashed) password directly
+    //    bypassing pre('save') so it does NOT get double-hashed
+    await Organizer.updateOne(
+      { _id: req.user.id },
+      {
+        $set: {
+          password: request.newPasswordHash,          // already bcrypt hash — set directly
+          "passwordResetRequests.$[elem].appliedByOrganizer": true,
+          "passwordResetRequests.$[elem].resolvedAt": new Date(),
+        },
+      },
+      { arrayFilters: [{ "elem._id": request._id }] }
+    );
+
+    res.json({
+      message:
+        "Password changed successfully! Please log in again with your new password.",
+    });
+  } catch (error) {
+    console.error("applyApprovedPassword error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ── Get Stats ──
 export const getOrganizerStats = async (req, res) => {
   try {
     const events = await Event.find({ organizerId: req.user.id });
     const eventIds = events.map((e) => e._id);
-    const registrations = await Registration.find({ eventId: { $in: eventIds }, status: { $ne: "CANCELLED" } });
+    const registrations = await Registration.find({
+      eventId: { $in: eventIds },
+      status: { $ne: "CANCELLED" },
+    });
     const totalRevenue = events.reduce((sum, evt) => {
-      const count = registrations.filter((r) => r.eventId.toString() === evt._id.toString()).length;
+      const count = registrations.filter(
+        (r) => r.eventId.toString() === evt._id.toString()
+      ).length;
       return sum + count * (evt.registrationFee || 0);
     }, 0);
-    res.json({ totalEvents: events.length, totalRegistrations: registrations.length, totalRevenue });
+    res.json({
+      totalEvents: events.length,
+      totalRegistrations: registrations.length,
+      totalRevenue,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status (500).json({ message: error.message });
   }
 };

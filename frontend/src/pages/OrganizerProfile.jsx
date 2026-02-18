@@ -1,23 +1,298 @@
 import { useEffect, useState } from "react";
 import {
-  Container,
-  TextField,
-  Typography,
-  Button,
-  Box,
-  Grid,
-  Paper,
-  Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
+  Container, TextField, Typography, Button, Box, Grid,
+  Paper, Alert, CircularProgress, Chip, Divider,
 } from "@mui/material";
-
 import OrganizerNavbar from "../components/OrganizerNavbar";
 import API from "../services/api";
 
+const PasswordResetSection = () => {
+  const [form, setForm] = useState({
+    reason: "",
+    currentPassword: "",
+    newPassword: "",
+  });
+  const [status, setStatus] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const fetchStatus = async () => {
+    try {
+      // ✅ correct path: /organizer/ not /organizers/
+      const res = await API.get("/organizer/password-reset-status");
+      setStatus(res.data.request);
+    } catch (e) {
+      console.error("fetchStatus error:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
+  const handleSubmit = async () => {
+    setMsg("");
+    setError("");
+
+    if (!form.reason.trim()) return setError("Please provide a reason.");
+    if (!form.currentPassword) return setError("Current password is required.");
+    if (form.newPassword.length < 6)
+      return setError("New password must be at least 6 characters.");
+
+    setLoading(true);
+    try {
+      // ✅ correct path
+      const res = await API.post("/organizer/request-password-reset", form);
+      setMsg(res.data.message);
+      setForm({ reason: "", currentPassword: "", newPassword: "" });
+      fetchStatus();
+    } catch (e) {
+      setError(e.response?.data?.message || "Error submitting request.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApply = async () => {
+    if (!window.confirm("Apply the new password now? You will need to log in again."))
+      return;
+    setMsg("");
+    setError("");
+    setLoading(true);
+    try {
+      // ✅ PATCH not POST, correct path
+      const res = await API.patch(`/organizer/apply-password/${status._id}`);
+      setMsg(res.data.message);
+      setStatus(null);
+    } catch (e) {
+      setError(e.response?.data?.message || "Error applying password.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mt: 0 }}
+    >
+      <Typography variant="h6" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 1 }}>
+        🔐 Password Reset
+      </Typography>
+      <Divider sx={{ mb: 3 }} />
+
+      {msg && (
+        <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+          {msg}
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* ── Active Request Status Banner ── */}
+      {status && (
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor:
+              status.status === "APPROVED"
+                ? "#a5d6a7"
+                : status.status === "REJECTED"
+                ? "#ef9a9a"
+                : "#ffe082",
+            bgcolor:
+              status.status === "APPROVED"
+                ? "#f1f8f1"
+                : status.status === "REJECTED"
+                ? "#fff5f5"
+                : "#fffde7",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Current Request Status:
+            </Typography>
+            <Chip
+              label={status.status}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                bgcolor:
+                  status.status === "APPROVED"
+                    ? "#e8f5e9"
+                    : status.status === "REJECTED"
+                    ? "#ffebee"
+                    : "#fff3e0",
+                color:
+                  status.status === "APPROVED"
+                    ? "#2e7d32"
+                    : status.status === "REJECTED"
+                    ? "#c62828"
+                    : "#e65100",
+              }}
+            />
+          </Box>
+
+          <Typography variant="body2" sx={{ color: "#555" }}>
+            Reason submitted: <em>{status.reason}</em>
+          </Typography>
+
+          {status.adminNote && (
+            <Typography variant="body2" sx={{ mt: 0.5, color: "#555" }}>
+              Admin note: <em>"{status.adminNote}"</em>
+            </Typography>
+          )}
+
+          {/* ── APPROVED → show Apply button ── */}
+          {status.status === "APPROVED" && !status.appliedByOrganizer && (
+            <Button
+              variant="contained"
+              onClick={handleApply}
+              disabled={loading}
+              sx={{
+                mt: 2,
+                textTransform: "none",
+                fontWeight: 700,
+                bgcolor: "#2e7d32",
+                borderRadius: 2,
+                "&:hover": { bgcolor: "#1b5e20" },
+              }}
+            >
+              {loading ? (
+                <CircularProgress size={18} sx={{ color: "white" }} />
+              ) : (
+                "✅ Apply New Password"
+              )}
+            </Button>
+          )}
+
+          {status.status === "APPROVED" && status.appliedByOrganizer && (
+            <Typography
+              variant="body2"
+              sx={{ mt: 1, color: "#2e7d32", fontWeight: 600 }}
+            >
+              ✓ Password has been applied. Please log in with your new password.
+            </Typography>
+          )}
+
+          {/* ── REJECTED → let them submit a new one ── */}
+          {status.status === "REJECTED" && (
+            <Typography variant="body2" sx={{ mt: 1, color: "#c62828" }}>
+              You can submit a new request below.
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* ── Form: only show when no PENDING request ── */}
+      {(!status || status.status === "REJECTED") && (
+        <Box
+          sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
+        >
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            Your request will go to Admin for approval. Your password will
+            only change after Admin approves <strong>and</strong> you click
+            "Apply New Password".
+          </Alert>
+
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
+            >
+              Current Password *
+            </Typography>
+            <TextField
+              fullWidth
+              type="password"
+              size="small"
+              value={form.currentPassword}
+              onChange={(e) =>
+                setForm({ ...form, currentPassword: e.target.value })
+              }
+              placeholder="Enter your current password"
+            />
+          </Box>
+
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
+            >
+              New Password * (min 6 characters)
+            </Typography>
+            <TextField
+              fullWidth
+              type="password"
+              size="small"
+              value={form.newPassword}
+              onChange={(e) =>
+                setForm({ ...form, newPassword: e.target.value })
+              }
+              placeholder="Enter your new password"
+            />
+          </Box>
+
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
+            >
+              Reason for Password Change *
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              size="small"
+              value={form.reason}
+              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+              placeholder="e.g., Routine security change, forgot old password, etc."
+            />
+          </Box>
+
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={loading}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              bgcolor: "#673ab7",
+              borderRadius: 2,
+              alignSelf: "flex-start",
+              px: 4,
+              "&:hover": { bgcolor: "#5e35b1" },
+            }}
+          >
+            {loading ? (
+              <CircularProgress size={20} sx={{ color: "white" }} />
+            ) : (
+              "Submit Reset Request"
+            )}
+          </Button>
+        </Box>
+      )}
+
+      {/* ── PENDING: block form, show waiting message ── */}
+      {status && status.status === "PENDING" && (
+        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+          Your request is pending admin review. You cannot submit another
+          request until this one is resolved.
+        </Alert>
+      )}
+    </Paper>
+  );
+};
+
+// ─────────────────────────────────────────────────────
 const OrganizerProfile = () => {
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
@@ -26,13 +301,6 @@ const OrganizerProfile = () => {
   const [success, setSuccess] = useState("");
   const [editMode, setEditMode] = useState(false);
 
-  // Password Change Dialog
-  const [passwordDialog, setPasswordDialog] = useState(false);
-  const [passwordReason, setPasswordReason] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordSuccess, setPasswordSuccess] = useState("");
-
-  // Editable fields state
   const [description, setDescription] = useState("");
   const [establishedYear, setEstablishedYear] = useState("");
   const [memberCount, setMemberCount] = useState("");
@@ -45,15 +313,9 @@ const OrganizerProfile = () => {
   const fetchProfile = async () => {
     try {
       const res = await API.get("/organizer/profile");
-
-      // API returns organizer directly, not nested under res.data.organizer
       const organizer = res.data.organizer || res.data;
-      const stats = res.data.stats || null;
-
       setProfile(organizer);
-      setStats(stats);
-
-      // Initialize editable fields
+      setStats(res.data.stats || null);
       setDescription(organizer.description || "");
       setEstablishedYear(organizer.establishedYear || "");
       setMemberCount(organizer.memberCount || "");
@@ -69,14 +331,11 @@ const OrganizerProfile = () => {
     }
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  useEffect(() => { fetchProfile(); }, []);
 
   const handleSaveProfile = async () => {
     setError("");
     setSuccess("");
-
     try {
       await API.put("/organizer/profile", {
         description,
@@ -84,13 +343,8 @@ const OrganizerProfile = () => {
         memberCount: memberCount || null,
         contactPhone,
         website,
-        socialMedia: {
-          twitter,
-          instagram,
-          linkedin,
-        },
+        socialMedia: { twitter, instagram, linkedin },
       });
-
       setSuccess("Profile updated successfully!");
       setEditMode(false);
       fetchProfile();
@@ -100,60 +354,23 @@ const OrganizerProfile = () => {
   };
 
   const handleCancelEdit = () => {
-    // Reset to original values
-    setDescription(profile.description || "");
-    setEstablishedYear(profile.establishedYear || "");
-    setMemberCount(profile.memberCount || "");
-    setContactPhone(profile.contactPhone || "");
-    setWebsite(profile.website || "");
-    setTwitter(profile.socialMedia?.twitter || "");
-    setInstagram(profile.socialMedia?.instagram || "");
-    setLinkedin(profile.socialMedia?.linkedin || "");
+    setDescription(profile?.description || "");
+    setEstablishedYear(profile?.establishedYear || "");
+    setMemberCount(profile?.memberCount || "");
+    setContactPhone(profile?.contactPhone || "");
+    setWebsite(profile?.website || "");
+    setTwitter(profile?.socialMedia?.twitter || "");
+    setInstagram(profile?.socialMedia?.instagram || "");
+    setLinkedin(profile?.socialMedia?.linkedin || "");
     setEditMode(false);
     setError("");
-  };
-
-  const handlePasswordRequest = async () => {
-    setPasswordError("");
-    setPasswordSuccess("");
-
-    if (!passwordReason.trim()) {
-      setPasswordError("Please provide a reason for password reset");
-      return;
-    }
-
-    try {
-      await API.post("/organizer/request-password-reset", {
-        reason: passwordReason,
-      });
-
-      setPasswordSuccess(
-        "Password reset request submitted! Admin will review your request."
-      );
-      setPasswordReason("");
-      setTimeout(() => {
-        setPasswordDialog(false);
-        setPasswordSuccess("");
-      }, 2000);
-    } catch (err) {
-      setPasswordError(
-        err.response?.data?.message || "Failed to submit request"
-      );
-    }
   };
 
   if (loading) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
         <OrganizerNavbar />
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "60vh",
-          }}
-        >
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
           <CircularProgress sx={{ color: "#673ab7" }} />
         </Box>
       </Box>
@@ -163,62 +380,28 @@ const OrganizerProfile = () => {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
       <OrganizerNavbar />
-
       <Container maxWidth="lg" sx={{ py: 4 }}>
+
         {/* Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3,
-          }}
-        >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a1a2e" }}>
             Organizer Profile
           </Typography>
-
           {!editMode ? (
-            <Button
-              variant="contained"
-              onClick={() => setEditMode(true)}
-              sx={{
-                textTransform: "none",
-                fontWeight: 600,
-                bgcolor: "#673ab7",
-                borderRadius: 2,
-                px: 3,
-                "&:hover": { bgcolor: "#5e35b1" },
-              }}
+            <Button variant="contained" onClick={() => setEditMode(true)}
+              sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#673ab7", borderRadius: 2, px: 3, "&:hover": { bgcolor: "#5e35b1" } }}
             >
               Edit Profile
             </Button>
           ) : (
             <Box sx={{ display: "flex", gap: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={handleCancelEdit}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  borderColor: "#ccc",
-                  color: "#666",
-                  borderRadius: 2,
-                  "&:hover": { borderColor: "#999" },
-                }}
+              <Button variant="outlined" onClick={handleCancelEdit}
+                sx={{ textTransform: "none", fontWeight: 600, borderColor: "#ccc", color: "#666", borderRadius: 2 }}
               >
                 Cancel
               </Button>
-              <Button
-                variant="contained"
-                onClick={handleSaveProfile}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  bgcolor: "#00897b",
-                  borderRadius: 2,
-                  "&:hover": { bgcolor: "#00796b" },
-                }}
+              <Button variant="contained" onClick={handleSaveProfile}
+                sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#00897b", borderRadius: 2, "&:hover": { bgcolor: "#00796b" } }}
               >
                 Save Changes
               </Button>
@@ -226,230 +409,58 @@ const OrganizerProfile = () => {
           )}
         </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-            {error}
-          </Alert>
-        )}
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        {success && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>{success}</Alert>}
 
-        {success && (
-          <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-            {success}
-          </Alert>
-        )}
-
-        {/* Stats Cards */}
+        {/* Stats */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 2,
-                p: 2,
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="body2" sx={{ color: "#888", mb: 0.5 }}>
-                Total Events
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: "#1a1a2e" }}>
-                {stats?.totalEvents || 0}
-              </Typography>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 2,
-                p: 2,
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="body2" sx={{ color: "#888", mb: 0.5 }}>
-                Upcoming
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: "#1976d2" }}>
-                {stats?.upcomingEvents || 0}
-              </Typography>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 2,
-                p: 2,
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="body2" sx={{ color: "#888", mb: 0.5 }}>
-                Completed
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: "#2e7d32" }}>
-                {stats?.completedEvents || 0}
-              </Typography>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 2,
-                p: 2,
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="body2" sx={{ color: "#888", mb: 0.5 }}>
-                Participants
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: "#673ab7" }}>
-                {stats?.totalParticipants || 0}
-              </Typography>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Paper
-              elevation={0}
-              sx={{
-                border: "1px solid #e0e0e0",
-                borderRadius: 2,
-                p: 2,
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="body2" sx={{ color: "#888", mb: 0.5 }}>
-                Followers
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: "#00897b" }}>
-                {stats?.followers || 0}
-              </Typography>
-            </Paper>
-          </Grid>
+          {[
+            { label: "Total Events", value: stats?.totalEvents || 0, color: "#1a1a2e" },
+            { label: "Upcoming", value: stats?.upcomingEvents || 0, color: "#1976d2" },
+            { label: "Completed", value: stats?.completedEvents || 0, color: "#2e7d32" },
+            { label: "Participants", value: stats?.totalParticipants || 0, color: "#673ab7" },
+            { label: "Followers", value: stats?.followers || 0, color: "#00897b" },
+          ].map((stat) => (
+            <Grid item xs={12} sm={6} md={2.4} key={stat.label}>
+              <Paper elevation={0}
+                sx={{ border: "1px solid #e0e0e0", borderRadius: 2, p: 2, textAlign: "center" }}
+              >
+                <Typography variant="body2" sx={{ color: "#888", mb: 0.5 }}>{stat.label}</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color }}>{stat.value}</Typography>
+              </Paper>
+            </Grid>
+          ))}
         </Grid>
 
         {/* Basic Information */}
-        <Paper
-          elevation={0}
-          sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}
-        >
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 700, color: "#1a1a2e", mb: 3 }}
-          >
+        <Paper elevation={0} sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 3 }}>
             Basic Information
           </Typography>
-
           <Grid container spacing={3}>
-            {/* NON-EDITABLE: Organization Name */}
             <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}>
                 Organization Name (Non-editable)
               </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={profile?.name || ""}
-                disabled
-                sx={{
-                  bgcolor: "#f5f5f5",
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: "#888",
-                  },
-                }}
+              <TextField fullWidth size="small" value={profile?.name || ""} disabled
+                sx={{ bgcolor: "#f5f5f5", "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: "#888" } }}
               />
             </Grid>
-
-            {/* NON-EDITABLE: Category */}
             <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}>
                 Category (Non-editable)
               </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={profile?.category || ""}
-                disabled
-                sx={{
-                  bgcolor: "#f5f5f5",
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: "#888",
-                  },
-                }}
+              <TextField fullWidth size="small" value={profile?.category || ""} disabled
+                sx={{ bgcolor: "#f5f5f5", "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: "#888" } }}
               />
             </Grid>
-
-            {/* EDITABLE: Description */}
             <Grid item xs={12}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}>
                 Description
               </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                size="small"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={!editMode}
-                placeholder="Describe your organization..."
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
-              />
-            </Grid>
-
-            {/* EDITABLE: Established Year */}
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                Established Year
-              </Typography>
-              <TextField
-                fullWidth
-                type="number"
-                size="small"
-                value={establishedYear}
-                onChange={(e) => setEstablishedYear(e.target.value)}
-                disabled={!editMode}
-                placeholder="2015"
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
-              />
-            </Grid>
-
-            {/* EDITABLE: Member Count */}
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                Member Count
-              </Typography>
-              <TextField
-                fullWidth
-                type="number"
-                size="small"
-                value={memberCount}
-                onChange={(e) => setMemberCount(e.target.value)}
-                disabled={!editMode}
-                placeholder="450"
+              <TextField fullWidth multiline rows={4} size="small"
+                value={description} onChange={(e) => setDescription(e.target.value)}
+                disabled={!editMode} placeholder="Describe your organization..."
                 sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
               />
             </Grid>
@@ -457,243 +468,26 @@ const OrganizerProfile = () => {
         </Paper>
 
         {/* Contact Information */}
-        <Paper
-          elevation={0}
-          sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}
-        >
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 700, color: "#1a1a2e", mb: 3 }}
-          >
+        <Paper elevation={0} sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 3 }}>
             Contact Information
           </Typography>
-
           <Grid container spacing={3}>
-            {/* NON-EDITABLE: Email */}
             <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}>
                 Email (Non-editable)
               </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={profile?.email || profile?.contactEmail || ""}
-                disabled
-                sx={{
-                  bgcolor: "#f5f5f5",
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: "#888",
-                  },
-                }}
-              />
-            </Grid>
-
-            {/* EDITABLE: Phone Number */}
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                Phone Number
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                disabled={!editMode}
-                placeholder="+91 98765 43210"
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
-              />
-            </Grid>
-
-            {/* EDITABLE: Website */}
-            <Grid item xs={12}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                Website
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                disabled={!editMode}
-                placeholder="https://techclub.university.edu"
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
-              />
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* Social Media - ALL EDITABLE */}
-        <Paper
-          elevation={0}
-          sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}
-        >
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 700, color: "#1a1a2e", mb: 3 }}
-          >
-            Social Media
-          </Typography>
-
-          <Grid container spacing={3}>
-            {/* EDITABLE: Twitter */}
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                Twitter Handle
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={twitter}
-                onChange={(e) => setTwitter(e.target.value)}
-                disabled={!editMode}
-                placeholder="@techclub_iiit"
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
-              />
-            </Grid>
-
-            {/* EDITABLE: Instagram */}
-            <Grid item xs={12} md={6}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                Instagram Handle
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={instagram}
-                onChange={(e) => setInstagram(e.target.value)}
-                disabled={!editMode}
-                placeholder="@techclub_official"
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
-              />
-            </Grid>
-
-            {/* EDITABLE: LinkedIn */}
-            <Grid item xs={12}>
-              <Typography
-                variant="body2"
-                sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
-              >
-                LinkedIn
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={linkedin}
-                onChange={(e) => setLinkedin(e.target.value)}
-                disabled={!editMode}
-                placeholder="techclub-iiit"
-                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
+              <TextField fullWidth size="small"
+                value={profile?.email || ""} disabled
+                sx={{ bgcolor: "#f5f5f5", "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: "#888" } }}
               />
             </Grid>
           </Grid>
         </Paper>
 
         {/* Security Settings */}
-        <Paper
-          elevation={0}
-          sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4 }}
-        >
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}
-          >
-            Security Settings
-          </Typography>
+        <PasswordResetSection />
 
-          <Button
-            variant="outlined"
-            onClick={() => setPasswordDialog(true)}
-            sx={{
-              textTransform: "none",
-              fontWeight: 600,
-              borderColor: "#673ab7",
-              color: "#673ab7",
-              borderRadius: 2,
-              "&:hover": {
-                borderColor: "#5e35b1",
-                bgcolor: "rgba(103, 58, 183, 0.04)",
-              },
-            }}
-          >
-            Change Password
-          </Button>
-        </Paper>
-
-        {/* Password Change Dialog */}
-        <Dialog
-          open={passwordDialog}
-          onClose={() => setPasswordDialog(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle sx={{ fontWeight: 700 }}>
-            Request Password Reset
-          </DialogTitle>
-          <DialogContent>
-            <Alert severity="info" sx={{ mb: 2, mt: 1, borderRadius: 2 }}>
-              Password reset requests must be approved by admin. Please provide a
-              reason for your request.
-            </Alert>
-
-            {passwordError && (
-              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                {passwordError}
-              </Alert>
-            )}
-
-            {passwordSuccess && (
-              <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-                {passwordSuccess}
-              </Alert>
-            )}
-
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="Reason for Password Reset"
-              value={passwordReason}
-              onChange={(e) => setPasswordReason(e.target.value)}
-              placeholder="e.g., Forgot my password, security concern, etc."
-              sx={{ mt: 1 }}
-            />
-          </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button
-              onClick={() => setPasswordDialog(false)}
-              sx={{ textTransform: "none", color: "#666" }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handlePasswordRequest}
-              variant="contained"
-              sx={{
-                textTransform: "none",
-                fontWeight: 600,
-                bgcolor: "#673ab7",
-                "&:hover": { bgcolor: "#5e35b1" },
-              }}
-            >
-              Submit Request
-            </Button>
-          </DialogActions>
-        </Dialog>
       </Container>
     </Box>
   );

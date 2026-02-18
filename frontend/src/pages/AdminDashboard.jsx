@@ -9,6 +9,13 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  Box,
+  Paper,
+  CircularProgress,
+  Alert,
+  Chip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 
 import API from "../services/api";
@@ -24,6 +31,7 @@ const AdminDashboard = () => {
     description: "",
     contactEmail: "",
   });
+  const [tabIndex, setTabIndex] = useState(0);
 
   const fetchOrganizers = async () => {
     const res = await API.get("/admin/organizers");
@@ -49,14 +57,9 @@ Password: ${res.data.organizer.generatedPassword}`
     fetchOrganizers();
   };
 
-  return (
-    <>
-      <AdminNavbar />
-      <Container>
-        <Typography variant="h4" sx={{ my: 3 }}>
-          Admin Dashboard
-        </Typography>
-
+  const tabs = [
+    { label: "Organizers", component: (
+      <>
         <Button
           variant="contained"
           onClick={() => setOpen(true)}
@@ -125,8 +128,144 @@ Password: ${res.data.organizer.generatedPassword}`
             </Button>
           </DialogActions>
         </Dialog>
+      </>
+    ) },
+    { label: "Password Reset Requests", component: <PasswordResetRequests /> }
+  ];
+
+  return (
+    <>
+      <AdminNavbar />
+      <Container>
+        <Typography variant="h4" sx={{ my: 3 }}>
+          Admin Dashboard
+        </Typography>
+
+        <Tabs
+          value={tabIndex}
+          onChange={(e, newValue) => setTabIndex(newValue)}
+          sx={{ mb: 3 }}
+        >
+          {tabs.map((tab, index) => (
+            <Tab key={index} label={tab.label} />
+          ))}
+        </Tabs>
+
+        {tabs[tabIndex].component}
       </Container>
     </>
+  );
+};
+
+const PasswordResetRequests = () => {
+  const [organizers, setOrganizers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState({});
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const res = await API.get("/admin/organizers");
+        // Only show organizers with PENDING requests
+        const withPending = res.data.filter((org) =>
+          org.passwordResetRequests?.some((r) => r.status === "PENDING")
+        );
+        setOrganizers(withPending);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetch();
+  }, []);
+
+  const handleAction = async (orgId, reqId, action) => {
+    try {
+      await API.patch(`/admin/password-reset-requests/${orgId}/${reqId}`, {
+        action,                        // "APPROVE" or "REJECT"
+        note: notes[reqId] || "",
+      });
+      setMsg(`Request ${action}D successfully.`);
+      setOrganizers((prev) =>
+        prev
+          .map((org) => ({
+            ...org,
+            passwordResetRequests: org.passwordResetRequests.map((r) =>
+              r._id === reqId ? { ...r, status: action === "APPROVE" ? "APPROVED" : "REJECTED" } : r
+            ),
+          }))
+          .filter((org) =>
+            org.passwordResetRequests.some((r) => r.status === "PENDING")
+          )
+      );
+    } catch (e) {
+      setMsg(e.response?.data?.message || "Error processing request.");
+    }
+  };
+
+  if (loading) return <CircularProgress />;
+
+  return (
+    <Box>
+      <Typography variant="h6" gutterBottom>
+        Password Reset Requests
+      </Typography>
+      {msg && <Alert severity="info" sx={{ mb: 2 }}>{msg}</Alert>}
+      {organizers.length === 0 ? (
+        <Typography color="text.secondary">No pending password reset requests.</Typography>
+      ) : (
+        organizers.map((org) =>
+          org.passwordResetRequests
+            .filter((r) => r.status === "PENDING")
+            .map((req) => (
+              <Paper key={req._id} sx={{ p: 2, mb: 2 }}>
+                <Typography variant="subtitle1">
+                  <strong>{org.name}</strong> ({org.email})
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  📝 Reason: {req.reason}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Requested at: {new Date(req.requestedAt).toLocaleString()}
+                </Typography>
+                <Chip
+                  label={req.status}
+                  color="warning"
+                  size="small"
+                  sx={{ ml: 2 }}
+                />
+                <Box sx={{ mt: 2, display: "flex", gap: 2, alignItems: "center" }}>
+                  <TextField
+                    size="small"
+                    label="Admin note (optional)"
+                    value={notes[req._id] || ""}
+                    onChange={(e) =>
+                      setNotes((prev) => ({ ...prev, [req._id]: e.target.value }))
+                    }
+                    sx={{ flex: 1 }}
+                  />
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={() => handleAction(org._id, req._id, "APPROVE")}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => handleAction(org._id, req._id, "REJECT")}
+                  >
+                    Reject
+                  </Button>
+                </Box>
+              </Paper>
+            ))
+        )
+      )}
+    </Box>
   );
 };
 

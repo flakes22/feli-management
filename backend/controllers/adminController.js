@@ -2,6 +2,9 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 
 import Organizer from "../models/Organizer.js";
+import Participant from "../models/Participant.js";
+import Event from "../models/Event.js";
+import Registration from "../models/Registration.js";
 
 // Create an organizer
 export const createOrganizer = async (req, res) => {
@@ -92,4 +95,81 @@ export const toggleOrganizerStatus = async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   };
-  
+
+// ── Get All Password Reset Requests ──
+export const getPasswordResetRequests = async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    // ✅ Must explicitly select passwordResetRequests — not excluded by default now
+    const organizers = await Organizer.find({
+      "passwordResetRequests.0": { $exists: true },
+    }).select("name email category passwordResetRequests");
+
+    const requests = [];
+    organizers.forEach((org) => {
+      org.passwordResetRequests.forEach((r) => {
+        if (status && status !== "all" && r.status !== status) return;
+        requests.push({
+          requestId: r._id,
+          organizerId: org._id,
+          organizerName: org.name,
+          organizerEmail: org.email,
+          organizerCategory: org.category,
+          reason: r.reason,
+          status: r.status,
+          adminNote: r.adminNote,
+          appliedByOrganizer: r.appliedByOrganizer,
+          requestedAt: r.requestedAt,
+          resolvedAt: r.resolvedAt,
+        });
+      });
+    });
+
+    requests.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+    res.json({ requests });
+  } catch (error) {
+    console.error("getPasswordResetRequests error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ── Approve / Reject Password Reset Request ──
+export const handlePasswordResetRequest = async (req, res) => {
+  try {
+    const { organizerId, requestId } = req.params;
+    const { action, adminNote } = req.body;
+
+    if (!["APPROVE", "REJECT"].includes(action))
+      return res.status(400).json({ message: "Action must be APPROVE or REJECT." });
+
+    const organizer = await Organizer.findById(organizerId);
+    if (!organizer)
+      return res.status(404).json({ message: "Organizer not found." });
+
+    const request = organizer.passwordResetRequests.id(requestId);
+    if (!request)
+      return res.status(404).json({ message: "Request not found." });
+    if (request.status !== "PENDING")
+      return res.status(400).json({ message: "This request has already been resolved." });
+
+    // ✅ Use updateOne with arrayFilters — avoids triggering pre('save') on password
+    await Organizer.updateOne(
+      { _id: organizerId, "passwordResetRequests._id": requestId },
+      {
+        $set: {
+          "passwordResetRequests.$.status": action === "APPROVE" ? "APPROVED" : "REJECTED",
+          "passwordResetRequests.$.adminNote": adminNote || "",
+          "passwordResetRequests.$.resolvedAt": new Date(),
+        },
+      }
+    );
+
+    res.json({
+      message: `Request ${action === "APPROVE" ? "approved" : "rejected"} successfully.`,
+    });
+  } catch (error) {
+    console.error("handlePasswordResetRequest error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};

@@ -8,8 +8,10 @@ import {
   deleteEvent,
   getOrganizerProfile,
   updateOrganizerProfile,
-  changePassword,
   getOrganizerStats,
+  requestPasswordReset,
+  getMyPasswordResetStatus,
+  applyApprovedPassword,
 } from "../controllers/organizerController.js";
 import { protect, authorize } from "../middleware/authMiddleware.js";
 
@@ -26,7 +28,11 @@ router.delete("/events/:eventId", protect, authorize("organizer"), deleteEvent);
 // ── Profile ──
 router.get("/profile", protect, authorize("organizer"), getOrganizerProfile);
 router.put("/profile", protect, authorize("organizer"), updateOrganizerProfile);
-router.put("/change-password", protect, authorize("organizer"), changePassword);
 router.get("/stats", protect, authorize("organizer"), getOrganizerStats);
+
+// ── Password Reset ──
+router.post("/request-password-reset", protect, authorize("organizer"), requestPasswordReset);
+router.get("/password-reset-status", protect, authorize("organizer"), getMyPasswordResetStatus);
+router.patch("/apply-password/:requestId", protect, authorize("organizer"), applyApprovedPassword);
 
 export default router;

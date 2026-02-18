@@ -1,7 +1,13 @@
 import express from "express";
-import {createOrganizer,getAllOrganizers,toggleOrganizerStatus} from "../controllers/adminController.js";
+import {
+  createOrganizer,
+  getAllOrganizers,
+  toggleOrganizerStatus,
+  getPasswordResetRequests,
+  handlePasswordResetRequest,
+} from "../controllers/adminController.js";
 
-import {protect,authorize} from "../middleware/authMiddleware.js";
+import { protect, authorize } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -25,6 +31,15 @@ router.patch(
   protect,
   authorize("admin"),
   toggleOrganizerStatus
+);
+
+// ── Password Reset Requests ──
+router.get("/password-reset-requests", protect, authorize("admin"), getPasswordResetRequests);
+router.patch(
+  "/password-reset-requests/:organizerId/:requestId",
+  protect,
+  authorize("admin"),
+  handlePasswordResetRequest
 );
 
 export default router;
