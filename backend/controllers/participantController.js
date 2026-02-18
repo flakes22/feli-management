@@ -98,49 +98,36 @@ export const getTrendingEvents = async (req, res) => {
 
 export const getClubs = async (req, res) => {
   try {
-    const { search, category } = req.query;
+    const participant = await Participant.findById(req.user.id);
 
-    let query = { isActive: true };
-
-    if (search) {
-      query.name = { $regex: search, $options: "i" };
-    }
-
-    if (category) {
-      query.category = category;
-    }
-
-    const clubs = await Organizer.find(query).select(
+    const clubs = await Organizer.find({ isActive: true }).select(
       "-password -generatedPassword -passwordResetRequest"
     );
 
-    // Get event counts for each club
     const clubsWithStats = await Promise.all(
       clubs.map(async (club) => {
-        const totalEvents = await Event.countDocuments({
-          organizerId: club._id,
-        });
 
-        const upcomingEvents = await Event.countDocuments({
-          organizerId: club._id,
-          status: { $in: ["PUBLISHED", "ONGOING"] },
-          startDate: { $gte: new Date() },
-        });
+        const isFollowing = participant.followedOrganizers
+          .map(id => id.toString())
+          .includes(club._id.toString());
 
         return {
           ...club.toObject(),
-          totalEvents,
-          upcomingEvents,
+          isFollowing
         };
       })
     );
 
     res.json(clubsWithStats);
+
   } catch (err) {
     console.error("getClubs error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
 
 export const getClubDetails = async (req, res) => {
   try {
@@ -218,24 +205,35 @@ export const toggleFollow = async (req, res) => {
       participant.followedOrganizers = [];
     }
 
-    const index = participant.followedOrganizers.indexOf(organizerId);
+    const index = participant.followedOrganizers.findIndex(
+      (id) => id.toString() === organizerId
+    );
 
     if (index > -1) {
       // Unfollow
       participant.followedOrganizers.splice(index, 1);
       await participant.save();
-      res.json({ message: "Unfollowed successfully", isFollowing: false });
+
+      return res.json({
+        message: "Unfollowed successfully",
+        isFollowing: false,
+      });
     } else {
       // Follow
       participant.followedOrganizers.push(organizerId);
       await participant.save();
-      res.json({ message: "Followed successfully", isFollowing: true });
+
+      return res.json({
+        message: "Followed successfully",
+        isFollowing: true,
+      });
     }
   } catch (err) {
     console.error("toggleFollow error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const getProfile = async (req, res) => {
   try {
@@ -280,7 +278,14 @@ export const getProfile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { firstName, lastName, contactNumber, department, year } = req.body;
+    const {
+      firstName,
+      lastName,
+      contactNumber,
+      collegeName,
+      interests,
+      participantType,
+    } = req.body;
 
     const participant = await Participant.findById(req.user.id);
 
@@ -291,16 +296,18 @@ export const updateProfile = async (req, res) => {
     if (firstName !== undefined) participant.firstName = firstName;
     if (lastName !== undefined) participant.lastName = lastName;
     if (contactNumber !== undefined) participant.contactNumber = contactNumber;
-    if (department !== undefined) participant.department = department;
-    if (year !== undefined) participant.year = year;
-
+    if (collegeName !== undefined) participant.collegeName = collegeName;
+    if (interests !== undefined) participant.interests = interests;
     await participant.save();
+
     res.json({ message: "Profile updated successfully" });
+
   } catch (err) {
     console.error("updateProfile error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const changePassword = async (req, res) => {
   try {

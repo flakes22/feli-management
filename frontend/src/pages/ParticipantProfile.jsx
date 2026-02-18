@@ -51,17 +51,19 @@ const ParticipantProfile = () => {
     try {
       setLoading(true);
       setError("");
-      
+
       const res = await API.get("/participant/profile");
       console.log("Profile data:", res.data);
-      
-      const p = res.data;
+
+      const p = res.data.participant;
+
       setProfile(p);
       setFirstName(p.firstName || "");
       setLastName(p.lastName || "");
       setContactNumber(p.contactNumber || "");
       setCollegeName(p.collegeName || "");
       setInterests(p.interests || []);
+
     } catch (err) {
       console.error("Profile fetch error:", err);
       console.error("Error response:", err.response?.data);
@@ -542,13 +544,13 @@ const ParticipantProfile = () => {
             Followed Clubs
           </Typography>
 
-          {!profile?.followedClubs || profile.followedClubs.length === 0 ? (
+          {!profile?.followedOrganizers || profile.followedOrganizers.length === 0 ? (
             <Typography variant="body2" sx={{ color: "#999" }}>
               You are not following any clubs yet. Browse events to discover organizers.
             </Typography>
           ) : (
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              {profile.followedClubs.map((org) => {
+              {profile.followedOrganizers.map((org) => {
                 const orgId = org._id || org;
                 const orgName = org.name || "Unknown Club";
 
