@@ -10,6 +10,10 @@ const participantSchema = new mongoose.Schema(
     contactNumber: String,
     department: String,
     year: Number,
+    role: {
+      type: String,
+      default: "participant",
+    },
     followedOrganizers: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Organizer" },
     ],
