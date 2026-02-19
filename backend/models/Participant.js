@@ -6,8 +6,15 @@ const participantSchema = new mongoose.Schema(
     lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+    participantType: {
+      type: String,
+      enum: ["IIIT", "NON_IIIT"],
+      default: "IIIT",
+    },
+    collegeName: { type: String, default: "" },
     rollNumber: { type: String, unique: true, sparse: true },
     contactNumber: String,
+    interests: [{ type: String }],
     department: String,
     year: Number,
     role: {

@@ -4,9 +4,47 @@ import Participant from "../models/Participant.js";
 import Registration from "../models/Registration.js";
 import bcrypt from "bcryptjs";
 
+const normalizeInterests = (interests = []) => {
+  if (!Array.isArray(interests)) return [];
+
+  const seen = new Set();
+  const normalized = [];
+  for (const interest of interests) {
+    const cleaned = String(interest || "").trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(cleaned);
+  }
+  return normalized.slice(0, 20);
+};
+
+const getInterestScore = (event, normalizedInterests = []) => {
+  if (!normalizedInterests.length) return 0;
+
+  const textPool = [
+    event?.name,
+    event?.description,
+    event?.eligibility,
+    event?.organizerId?.name,
+    event?.organizerId?.category,
+    ...(Array.isArray(event?.tags) ? event.tags : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  let score = 0;
+  for (const interest of normalizedInterests) {
+    if (textPool.includes(interest.toLowerCase())) score += 1;
+  }
+  return score;
+};
+
 export const browseEvents = async (req, res) => {
   try {
-    const { search, type, category } = req.query;
+    const { search, type, category, eligibility, startDate, endDate, followedOnly } = req.query;
 
     let query = { status: "PUBLISHED" };
 
@@ -21,9 +59,15 @@ export const browseEvents = async (req, res) => {
       query.type = type;
     }
 
+    const participant = await Participant.findById(req.user.id).select("interests followedOrganizers");
+    const followedOrgIds = new Set(
+      (participant?.followedOrganizers || []).map((id) => id.toString())
+    );
+    const participantInterests = normalizeInterests(participant?.interests || []);
+
     const events = await Event.find(query)
       .populate("organizerId", "name category")
-      .sort({ startDate: 1 });
+      .sort({ startDate: 1, createdAt: -1 });
 
     // Filter by organizer category if provided
     let filteredEvents = events;
@@ -33,7 +77,41 @@ export const browseEvents = async (req, res) => {
       );
     }
 
-    res.json(filteredEvents);
+    if (eligibility) {
+      const elig = eligibility.toLowerCase();
+      filteredEvents = filteredEvents.filter((e) =>
+        (e.eligibility || "").toLowerCase().includes(elig)
+      );
+    }
+
+    if (startDate) {
+      const start = new Date(startDate);
+      filteredEvents = filteredEvents.filter((e) => !e.startDate || new Date(e.startDate) >= start);
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      filteredEvents = filteredEvents.filter((e) => !e.startDate || new Date(e.startDate) <= end);
+    }
+
+    if (String(followedOnly) === "true") {
+      filteredEvents = filteredEvents.filter(
+        (e) => e.organizerId?._id && followedOrgIds.has(e.organizerId._id.toString())
+      );
+    }
+
+    const rankedEvents = filteredEvents
+      .map((event) => ({
+        event,
+        score: getInterestScore(event, participantInterests),
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(a.event.startDate || 0) - new Date(b.event.startDate || 0);
+      })
+      .map((item) => item.event);
+
+    res.json(rankedEvents);
   } catch (err) {
     console.error("browseEvents error:", err);
     res.status(500).json({ message: "Server error" });
@@ -81,15 +159,31 @@ export const getEventDetails = async (req, res) => {
 
 export const getTrendingEvents = async (req, res) => {
   try {
+    const participant = await Participant.findById(req.user.id).select("interests");
+    const participantInterests = normalizeInterests(participant?.interests || []);
+
     const events = await Event.find({
       status: "PUBLISHED",
       startDate: { $gte: new Date() },
     })
       .populate("organizerId", "name category")
       .sort({ registrationCount: -1 })
-      .limit(10);
+      .limit(50);
 
-    res.json(events);
+    const ranked = events
+      .map((event) => {
+        const interestScore = getInterestScore(event, participantInterests);
+        const popularity = Number(event.registrationCount || 0);
+        return {
+          event,
+          score: interestScore * 3 + popularity / 100,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map((item) => item.event);
+
+    res.json(ranked);
   } catch (err) {
     console.error("getTrendingEvents error:", err);
     res.status(500).json({ message: "Server error" });
@@ -284,7 +378,6 @@ export const updateProfile = async (req, res) => {
       contactNumber,
       collegeName,
       interests,
-      participantType,
     } = req.body;
 
     const participant = await Participant.findById(req.user.id);
@@ -297,7 +390,7 @@ export const updateProfile = async (req, res) => {
     if (lastName !== undefined) participant.lastName = lastName;
     if (contactNumber !== undefined) participant.contactNumber = contactNumber;
     if (collegeName !== undefined) participant.collegeName = collegeName;
-    if (interests !== undefined) participant.interests = interests;
+    if (interests !== undefined) participant.interests = normalizeInterests(interests);
     await participant.save();
 
     res.json({ message: "Profile updated successfully" });
@@ -341,4 +434,3 @@ export const changePassword = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-

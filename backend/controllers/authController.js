@@ -5,6 +5,22 @@ import Participant from "../models/Participant.js";
 import Organizer from "../models/Organizer.js";
 import Admin from "../models/Admin.js";
 
+const normalizeInterests = (interests = []) => {
+  if (!Array.isArray(interests)) return [];
+
+  const seen = new Set();
+  const normalized = [];
+  for (const interest of interests) {
+    const cleaned = String(interest || "").trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(cleaned);
+  }
+  return normalized.slice(0, 20);
+};
+
 const generateToken=(user)=>{
     return jwt.sign({
         id: user._id,
@@ -27,6 +43,7 @@ export const registerParticipant = async (req, res) => {
         participantType,
         collegeName,
         contactNumber,
+        interests,
       } = req.body;
   
       if (
@@ -55,6 +72,7 @@ export const registerParticipant = async (req, res) => {
         participantType,
         collegeName,
         contactNumber,
+        interests: normalizeInterests(interests),
       });
   
       const token = generateToken(participant);

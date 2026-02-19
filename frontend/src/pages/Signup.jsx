@@ -9,7 +9,14 @@ import {
   Avatar,
   Link,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Chip,
+  IconButton,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import API from "../services/api";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 
@@ -29,6 +36,10 @@ const Signup = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [interestInput, setInterestInput] = useState("");
+  const [interests, setInterests] = useState([]);
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
 
   const handleChange = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value });
@@ -87,7 +98,7 @@ const Signup = () => {
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("role", res.data.role);
 
-      navigate("/participant/dashboard");
+      setOnboardingOpen(true);
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed. Please try again.");
     } finally {
@@ -98,6 +109,40 @@ const Signup = () => {
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
       handleSignup();
+    }
+  };
+
+  const addInterest = () => {
+    const cleaned = interestInput.trim();
+    if (!cleaned) return;
+    if (interests.some((i) => i.toLowerCase() === cleaned.toLowerCase())) {
+      setInterestInput("");
+      return;
+    }
+    setInterests((prev) => [...prev, cleaned]);
+    setInterestInput("");
+  };
+
+  const removeInterest = (interestToRemove) => {
+    setInterests((prev) => prev.filter((i) => i !== interestToRemove));
+  };
+
+  const completeOnboarding = async (skip = false) => {
+    if (skip) {
+      navigate("/participant/dashboard");
+      return;
+    }
+
+    setOnboardingSaving(true);
+    setError("");
+    try {
+      await API.put("/participant/profile", { interests });
+      navigate("/participant/dashboard");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save interests. You can update them later in Profile.");
+      navigate("/participant/dashboard");
+    } finally {
+      setOnboardingSaving(false);
     }
   };
 
@@ -346,6 +391,67 @@ const Signup = () => {
           </Link>
         </Box>
       </Paper>
+
+      <Dialog open={onboardingOpen} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Set Your Interests (Optional)</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "#666", mb: 2 }}>
+            Pick areas you like. This helps us personalize event ordering and recommendations.
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="e.g., AI, Music, Sports, Robotics"
+              value={interestInput}
+              onChange={(e) => setInterestInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addInterest();
+                }
+              }}
+            />
+            <IconButton
+              onClick={addInterest}
+              sx={{ border: "1px solid #673ab7", color: "#673ab7", borderRadius: 2 }}
+            >
+              <AddIcon />
+            </IconButton>
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            {interests.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "#999" }}>
+                No interests selected yet.
+              </Typography>
+            ) : (
+              interests.map((interest) => (
+                <Chip
+                  key={interest}
+                  label={interest}
+                  onDelete={() => removeInterest(interest)}
+                  sx={{ bgcolor: "#673ab7", color: "white" }}
+                />
+              ))
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => completeOnboarding(true)} sx={{ textTransform: "none", color: "#666" }}>
+            Skip for now
+          </Button>
+          <Button
+            variant="contained"
+            disabled={onboardingSaving}
+            onClick={() => completeOnboarding(false)}
+            sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#673ab7", "&:hover": { bgcolor: "#5e35b1" } }}
+          >
+            {onboardingSaving ? "Saving..." : "Save & Continue"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
