@@ -22,7 +22,7 @@ connectDB();
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://your-frontend-domain.vercel.app"
+    "https://feli-management.vercel.app"
   ],
   credentials: true
 }));
