@@ -1,4 +1,3 @@
-import bcrypt from "bcrypt";
 import crypto from "crypto";
 
 import Organizer from "../models/Organizer.js";
@@ -21,10 +20,12 @@ export const createOrganizer = async (req, res) => {
       const loginEmail =
         name.toLowerCase().replace(/\s+/g, "") + "@felicity.com";
   
-      const existing = await Organizer.findOne({ loginEmail });
+      const existing = await Organizer.findOne({
+        $or: [{ email: contactEmail }, { loginEmail }],
+      });
       if (existing) {
         return res.status(400).json({
-          message: "Organizer already exists",
+          message: "Organizer already exists (email or login email in use)",
         });
       }
   
@@ -33,15 +34,14 @@ export const createOrganizer = async (req, res) => {
         .randomBytes(6)
         .toString("hex");
   
-      const hashedPassword = await bcrypt.hash(plainPassword, 10);
-  
       const organizer = await Organizer.create({
         name,
         category,
         description,
-        contactEmail,
+        email: contactEmail,
         loginEmail,
-        password: hashedPassword,
+        // Keep plain here; Organizer pre-save hook hashes once.
+        password: plainPassword,
       });
   
       res.status(201).json({

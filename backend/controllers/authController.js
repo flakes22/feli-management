@@ -77,7 +77,9 @@ export const registerParticipant = async (req, res) => {
       let user = await Participant.findOne({ email });
   
       if (!user) {
-        user = await Organizer.findOne({ loginEmail: email });
+        user = await Organizer.findOne({
+          $or: [{ loginEmail: email }, { email }],
+        });
       }
   
       if (!user) {

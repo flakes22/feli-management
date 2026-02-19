@@ -4,6 +4,27 @@ import Registration from "../models/Registration.js";
 import QRCode from "qrcode";
 import { sendTicketEmail } from "../utils/sendEmail.js";
 
+const handleRegistrationDuplicateError = (err, res, action = "register") => {
+  if (err?.code !== 11000) return false;
+
+  const duplicateField = Object.keys(err?.keyPattern || {})[0] || "unknown";
+  console.error(`Duplicate key while trying to ${action}:`, {
+    duplicateField,
+    keyValue: err?.keyValue,
+  });
+
+  if (duplicateField === "participantId" || duplicateField === "eventId") {
+    return res.status(500).json({
+      message:
+        "Registration index conflict in database. Please contact admin to refresh registration indexes.",
+    });
+  }
+
+  return res.status(400).json({
+    message: "Duplicate registration data detected. Please try again.",
+  });
+};
+
 // ── Normal Event Registration ──
 export const registerForEvent = async (req, res) => {
   try {
@@ -26,10 +47,12 @@ export const registerForEvent = async (req, res) => {
     if (event.registrationLimit && totalRegs >= event.registrationLimit)
       return res.status(400).json({ message: "Registration limit reached" });
 
+    // ✅ Only block if there's already an ACTIVE registration
+    // (CANCELLED ones are fine — allows re-registration after cancellation)
     const existing = await Registration.findOne({
       participantId,
       eventId,
-      status: { $ne: "CANCELLED" },
+      status: { $in: ["REGISTERED", "ATTENDED"] }, // ← was $ne: "CANCELLED", same effect but explicit
     });
     if (existing)
       return res.status(400).json({ message: "Already registered for this event" });
@@ -103,6 +126,7 @@ export const registerForEvent = async (req, res) => {
       },
     });
   } catch (err) {
+    if (handleRegistrationDuplicateError(err, res, "register for event")) return;
     console.error("registerForEvent error:", err);
     res.status(500).json({ message: "Server error" });
   }
@@ -181,6 +205,7 @@ export const purchaseMerch = async (req, res) => {
       },
     });
   } catch (err) {
+    if (handleRegistrationDuplicateError(err, res, "purchase merch")) return;
     console.error("purchaseMerch error:", err);
     res.status(500).json({ message: "Server error" });
   }

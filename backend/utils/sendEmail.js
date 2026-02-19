@@ -54,7 +54,7 @@ export const sendTicketEmail = async ({
           <div style="background: #f9f5ff; border-left: 4px solid #673ab7; border-radius: 8px; padding: 20px; margin: 24px 0;">
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 8px 0; color: #888; font-size: 13px; width: 120px;">📅 Event</td>
+                <td style="padding: 8px 0; color: #888; font-size: 13px; width: 120px;"> Event</td>
                 <td style="padding: 8px 0; color: #1a1a2e; font-weight: 700; font-size: 15px;">${eventName}</td>
               </tr>
               <tr>

@@ -18,7 +18,10 @@ const passwordResetRequestSchema = new mongoose.Schema({
 const organizerSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
+    // Contact email for organizer profile/communication
     email: { type: String, required: true, unique: true },
+    // Backward-compatible login email used by existing admin/organizer flows
+    loginEmail: { type: String, unique: true, sparse: true },
     password: { type: String, required: true },
     category: { type: String, required: true },
     description: { type: String, default: "" },
@@ -39,15 +42,11 @@ const organizerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Only hash password if it was explicitly modified
-organizerSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-  try {
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-  } catch (err) {
-    next(err);
-  }
+// Hash password only when it changes.
+// Promise-style middleware avoids `next is not a function` issues.
+organizerSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 export default mongoose.model("Organizer", organizerSchema);
