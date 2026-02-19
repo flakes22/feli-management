@@ -20,8 +20,9 @@ const PORT= process.env.PORT || 5001;
 connectDB();
 
 app.use(cors({
-  origin: "*"
+  origin: "*",
 }));
+
 app.use(express.json());
 
 // Routes
