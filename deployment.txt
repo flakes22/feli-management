@@ -1,0 +1,8 @@
+Frontend URL:
+https://feli-management.vercel.app
+
+Backend Base API URL:
+https://feli-management.onrender.com
+
+Database:
+MongoDB Atlas (Connected via environment variable MONGO_URI)
