@@ -18,11 +18,27 @@ const app=express();
 const PORT= process.env.PORT || 5001;
 
 connectDB();
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
 
+const allowedOrigins = [
+  "http://localhost:5173",                        // local dev
+  "https://feli-management.vercel.app/",             // your actual Vercel URL
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
 app.use(express.json());
 
