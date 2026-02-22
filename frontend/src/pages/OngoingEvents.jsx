@@ -15,13 +15,45 @@ import { useNavigate } from "react-router-dom";
 
 const OngoingEvents = () => {
   const [events, setEvents] = useState([]);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const fetchEvents = async () => {
-    const res = await API.get(
-      "/organizer/ongoing-events"
-    );
-    setEvents(res.data);
+    const ongoingEndpoints = [
+      "/organizer/ongoing-events",
+      "/organizer/ongoing",
+      "/organizer/event/ongoing",
+    ];
+
+    try {
+      setError("");
+      let res = null;
+      let lastError = null;
+
+      for (const endpoint of ongoingEndpoints) {
+        try {
+          res = await API.get(endpoint);
+          break;
+        } catch (err) {
+          lastError = err;
+          if (err.response?.status !== 404) {
+            break;
+          }
+        }
+      }
+
+      if (!res) {
+        throw lastError || new Error("Failed to load ongoing events.");
+      }
+
+      setEvents(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setEvents([]);
+      setError(
+        err.response?.data?.message ||
+          "Failed to load ongoing events."
+      );
+    }
   };
 
   useEffect(() => {
@@ -35,6 +67,12 @@ const OngoingEvents = () => {
         <Typography variant="h4" gutterBottom>
           Ongoing Events
         </Typography>
+
+        {error && (
+          <Typography color="error" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+        )}
 
         {events.length === 0 && (
           <Typography>

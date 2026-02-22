@@ -132,9 +132,9 @@ const CreateEvent = () => {
       if (!f.label.trim()) return setError("All field labels are required.");
       if (
         (f.fieldType === "DROPDOWN") &&
-        !f.options.trim()
+        (!f.options || !f.options.trim())
       )
-        return setError(`Dropdown field "${f.label}" needs options.`);
+        return setError(`Dropdown field "${f.label}" needs options (comma-separated).`);
     }
 
     setLoading(true);
@@ -143,10 +143,11 @@ const CreateEvent = () => {
       const formattedFields = customFields.map((f) => ({
         label: f.label,
         fieldType: f.fieldType,
+        type: f.fieldType, // legacy compatibility for older backend shape
         required: f.required,
         options:
-          f.fieldType === "DROPDOWN"
-            ? f.options.split(",").map((o) => o.trim()).filter(Boolean)
+          (f.fieldType === "DROPDOWN")
+            ? f.options?.split(",").map((o) => o.trim()).filter(Boolean) || []
             : [],
       }));
 
@@ -306,7 +307,7 @@ const CreateEvent = () => {
                   onChange={(e) => setType(e.target.value)}
                 >
                   <MenuItem value="NORMAL">Normal</MenuItem>
-                  <MenuItem value="MERCHANDISE">Merchandise</MenuItem>
+                  <MenuItem value="MERCH">Merchandise</MenuItem>
                 </TextField>
               </Grid>
 
@@ -670,8 +671,8 @@ const CreateEvent = () => {
                         />
                       </Grid>
 
-                      {/* Dropdown options */}
-                      {field.fieldType === "DROPDOWN" && (
+                      {/* Options input */}
+                      {(field.fieldType === "DROPDOWN") && (
                         <Grid item xs={12}>
                           <TextField
                             fullWidth

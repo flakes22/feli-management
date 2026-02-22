@@ -37,6 +37,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import LockIcon from "@mui/icons-material/Lock";
 import API from "../services/api";
 import OrganizerNavbar from "../components/OrganizerNavbar";
+import DiscussionForum from "../components/DiscussionForum";
 
 const OrganizerEventDetail = () => {
   const { eventId } = useParams();
@@ -862,6 +863,8 @@ const OrganizerEventDetail = () => {
             </Table>
           </TableContainer>
         </Paper>
+
+        <DiscussionForum eventId={eventId} />
 
         {/* ── Edit Dialog ── */}
         <Dialog

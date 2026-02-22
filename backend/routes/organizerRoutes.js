@@ -2,6 +2,7 @@ import express from "express";
 import {
   createEvent,
   getMyEvents,
+  getOngoingEvents,
   getEventDetail,
   updateEvent,
   publishEvent,
@@ -20,6 +21,8 @@ const router = express.Router();
 // ── Events ──
 router.post("/events", protect, authorize("organizer"), createEvent);
 router.get("/events", protect, authorize("organizer"), getMyEvents);
+router.get("/ongoing-events", protect, authorize("organizer"), getOngoingEvents);
+router.get("/ongoing", protect, authorize("organizer"), getOngoingEvents);
 router.get("/events/:eventId", protect, authorize("organizer"), getEventDetail);
 router.put("/events/:eventId", protect, authorize("organizer"), updateEvent);
 router.patch("/events/:eventId/publish", protect, authorize("organizer"), publishEvent);

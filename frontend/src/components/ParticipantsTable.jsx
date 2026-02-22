@@ -27,11 +27,27 @@ const ParticipantsTable = ({ eventId }) => {
     fetchParticipants();
   }, [search]);
 
-  const exportCSV = () => {
-    window.open(
-      `http://localhost:5000/api/organizer/event/${eventId}/export`,
-      "_blank"
-    );
+  const exportCSV = async () => {
+    try {
+      const res = await API.get(
+        `/organizer/event/${eventId}/export`,
+        { responseType: "blob" }
+      );
+
+      const blob = new Blob([res.data], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `participants-${eventId}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export participants CSV:", error);
+    }
   };
 
   return (

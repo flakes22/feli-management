@@ -4,6 +4,31 @@ import Registration from "../models/Registration.js";
 import QRCode from "qrcode";
 import { sendTicketEmail } from "../utils/sendEmail.js";
 
+const getEventCustomFields = (event) => {
+  if (Array.isArray(event.customForm?.fields) && event.customForm.fields.length > 0) {
+    return event.customForm.fields
+      .filter((f) => f?.enabled !== false)
+      .map((f) => ({
+        label: f.label,
+        fieldType: f.fieldType || f.type || "TEXT",
+        required: Boolean(f.required),
+        options: Array.isArray(f.options) ? f.options : [],
+      }));
+  }
+  if (Array.isArray(event.customFields) && event.customFields.length > 0) {
+    return event.customFields;
+  }
+  if (Array.isArray(event.customFormFields) && event.customFormFields.length > 0) {
+    return event.customFormFields.map((f) => ({
+      label: f.label,
+      fieldType: f.fieldType || f.type || "TEXT",
+      required: Boolean(f.required),
+      options: Array.isArray(f.options) ? f.options : [],
+    }));
+  }
+  return [];
+};
+
 const handleRegistrationDuplicateError = (err, res, action = "register") => {
   if (err?.code !== 11000) return false;
 
@@ -58,11 +83,18 @@ export const registerForEvent = async (req, res) => {
       return res.status(400).json({ message: "Already registered for this event" });
 
     // Validate custom fields
-    if (event.customFields && event.customFields.length > 0) {
-      for (const field of event.customFields) {
+    const eventCustomFields = getEventCustomFields(event);
+    if (eventCustomFields.length > 0) {
+      for (const field of eventCustomFields) {
         if (field.required) {
           const response = customFieldResponses?.find((r) => r.fieldLabel === field.label);
-          if (!response || !response.response)
+          const value = response?.response;
+          const isMissing =
+            value === undefined ||
+            value === null ||
+            value === "" ||
+            (field.fieldType === "CHECKBOX" && value !== true);
+          if (!response || isMissing)
             return res.status(400).json({ message: `${field.label} is required` });
         }
       }

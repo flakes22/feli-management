@@ -41,7 +41,7 @@ export const updateEvent = async (req, res) => {
     });
 
     // Don't allow editing customFields if registrations exist
-    if (hasRegistrations > 0 && req.body.customFields) {
+    if (hasRegistrations > 0 && (req.body.customFields || req.body.customFormFields)) {
       return res.status(400).json({
         message: "Cannot modify registration form after first registration",
       });
@@ -200,7 +200,7 @@ export const exportParticipantsCSV = async (req, res) => {
         " " +
         r.participantId.lastName,
       Email: r.participantId.email,
-      TicketID: r.ticketId,
+      TicketID: r.ticketNumber,
       Status: r.status,
       RegisteredAt: r.createdAt,
     }));

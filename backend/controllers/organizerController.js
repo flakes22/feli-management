@@ -3,11 +3,26 @@ import Organizer from "../models/Organizer.js";
 import Registration from "../models/Registration.js";
 import bcrypt from "bcryptjs";
 
+const normalizeCustomFieldsInput = (fields = []) =>
+  (fields || []).map((f) => ({
+    label: f.label,
+    fieldType: f.fieldType || f.type || "TEXT",
+    required: Boolean(f.required),
+    options: Array.isArray(f.options) ? f.options : [],
+  }));
+
 // ── Create Event (Draft) ──
 export const createEvent = async (req, res) => {
   try {
     const organizerId = req.user.id;
-    const event = await Event.create({ ...req.body, organizerId, status: "DRAFT" });
+    const payload = { ...req.body, organizerId, status: "DRAFT" };
+
+    const incomingCustomFields = payload.customFields || payload.customFormFields;
+    if (incomingCustomFields !== undefined) {
+      payload.customFields = normalizeCustomFieldsInput(incomingCustomFields);
+    }
+
+    const event = await Event.create(payload);
     res.status(201).json({ message: "Event created in Draft mode", event });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -20,6 +35,68 @@ export const getMyEvents = async (req, res) => {
     const organizerId = req.user.id;
     const events = await Event.find({ organizerId }).sort({ createdAt: -1 });
     res.json(events);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ── Get Ongoing Events for Organizer ──
+export const getOngoingEvents = async (req, res) => {
+  try {
+    const organizerId = req.user.id;
+    const now = new Date();
+
+    const events = await Event.find({
+      organizerId,
+      status: { $in: ["PUBLISHED", "ONGOING"] },
+    }).sort({ startDate: 1, createdAt: -1 });
+
+    const toOngoingIds = [];
+    const toClosedIds = [];
+    const ongoingEvents = [];
+
+    for (const event of events) {
+      const hasStarted = !event.startDate || new Date(event.startDate) <= now;
+      const hasEnded = !!event.endDate && new Date(event.endDate) < now;
+      const isWithinWindow = hasStarted && !hasEnded;
+
+      if (event.status === "ONGOING" && hasEnded) {
+        toClosedIds.push(event._id);
+        continue;
+      }
+
+      if (event.status === "PUBLISHED" && isWithinWindow) {
+        toOngoingIds.push(event._id);
+      }
+
+      if (event.status === "ONGOING" || isWithinWindow) {
+        ongoingEvents.push(event);
+      }
+    }
+
+    if (toOngoingIds.length > 0) {
+      await Event.updateMany(
+        { _id: { $in: toOngoingIds } },
+        { $set: { status: "ONGOING" } }
+      );
+    }
+
+    if (toClosedIds.length > 0) {
+      await Event.updateMany(
+        { _id: { $in: toClosedIds } },
+        { $set: { status: "CLOSED" } }
+      );
+    }
+
+    const normalized = ongoingEvents.map((e) => ({
+      ...e.toObject(),
+      status:
+        toOngoingIds.some((id) => id.toString() === e._id.toString())
+          ? "ONGOING"
+          : e.status,
+    }));
+
+    res.json(normalized);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -85,12 +162,13 @@ export const updateEvent = async (req, res) => {
       const hasRegistrations = await Registration.countDocuments({
         eventId, status: { $ne: "CANCELLED" },
       });
-      const { customFields, ...otherUpdates } = req.body;
+      const { customFields, customFormFields, ...otherUpdates } = req.body;
       Object.assign(event, otherUpdates);
-      if (customFields !== undefined) {
+      const incomingCustomFields = customFields ?? customFormFields;
+      if (incomingCustomFields !== undefined) {
         if (hasRegistrations > 0)
           return res.status(400).json({ message: "Cannot modify form fields after registrations received." });
-        event.customFields = customFields;
+        event.customFields = normalizeCustomFieldsInput(incomingCustomFields);
       }
       await event.save();
       return res.json({ message: "Event updated", event });

@@ -29,6 +29,33 @@ import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 
 import API from "../services/api";
 import ParticipantNavbar from "../components/ParticipantNavbar";
+import DiscussionForum from "../components/DiscussionForum";
+
+const normalizeFieldType = (type = "TEXT") => {
+  const normalized = String(type || "TEXT").trim().toUpperCase();
+  if (normalized === "SELECT") return "DROPDOWN";
+  if (normalized === "TEXTAREA") return "TEXT";
+  return normalized;
+};
+
+const normalizeCustomFields = (event) => {
+  const fields =
+    (Array.isArray(event?.customForm?.fields) && event.customForm.fields.length > 0
+      ? event.customForm.fields
+      : Array.isArray(event?.customFields) && event.customFields.length > 0
+        ? event.customFields
+        : event?.customFormFields) || [];
+
+  return fields
+    .filter((field) => field?.enabled !== false)
+    .map((field) => ({
+      label: String(field?.label || "").trim(),
+      fieldType: normalizeFieldType(field?.fieldType || field?.type),
+      required: Boolean(field?.required),
+      options: Array.isArray(field?.options) ? field.options : [],
+    }))
+    .filter((field) => field.label);
+};
 
 const EventDetails = () => {
   const { eventId } = useParams();
@@ -53,8 +80,9 @@ const EventDetails = () => {
 
       // Initialize custom responses
       const initialResponses = {};
-      if (res.data.event.customFields) {
-        res.data.event.customFields.forEach((field) => {
+      const normalizedFields = normalizeCustomFields(res.data.event);
+      if (normalizedFields.length > 0) {
+        normalizedFields.forEach((field) => {
           initialResponses[field.label] = field.fieldType === "CHECKBOX" ? false : "";
         });
       }
@@ -76,10 +104,11 @@ const EventDetails = () => {
     setRegistering(true);
 
     try {
+      const normalizedFields = normalizeCustomFields(event);
       // Convert responses to array format
       const customFieldResponses = Object.keys(customResponses).map((label) => ({
         fieldLabel: label,
-        fieldType: event.customFields.find((f) => f.label === label)?.fieldType,
+        fieldType: normalizedFields.find((f) => f.label === label)?.fieldType,
         response: customResponses[label],
       }));
 
@@ -105,6 +134,20 @@ const EventDetails = () => {
       ...prev,
       [label]: value,
     }));
+  };
+
+  const handleFileChange = (label, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      handleCustomFieldChange(label, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl: reader.result,
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const renderCustomField = (field) => {
@@ -196,6 +239,43 @@ const EventDetails = () => {
           />
         );
 
+      case "DATE":
+        return (
+          <TextField
+            fullWidth
+            type="date"
+            size="small"
+            label={field.label}
+            required={field.required}
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.label, e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+        );
+
+      case "FILE":
+        return (
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.75 }}>
+              {field.label}
+              {field.required ? " *" : ""}
+            </Typography>
+            <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
+              Choose File
+              <input
+                hidden
+                type="file"
+                onChange={(e) => handleFileChange(field.label, e.target.files?.[0])}
+              />
+            </Button>
+            {value?.name && (
+              <Typography variant="caption" sx={{ display: "block", mt: 0.75 }}>
+                Selected: {value.name}
+              </Typography>
+            )}
+          </Box>
+        );
+
       default:
         return null;
     }
@@ -233,6 +313,7 @@ const EventDetails = () => {
   const isDeadlinePassed = stats?.isDeadlinePassed || false;
   const isLimitReached = stats?.isLimitReached || false;
   const canRegister = !isDeadlinePassed && !isLimitReached;
+  const eventCustomFields = normalizeCustomFields(event);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f0f2f5" }}>
@@ -478,6 +559,8 @@ const EventDetails = () => {
           </Paper>
         )}
 
+        <DiscussionForum eventId={eventId} />
+
         {/* Registration Dialog */}
         <Dialog
           open={registerDialog}
@@ -505,9 +588,9 @@ const EventDetails = () => {
               Please fill in all required fields to complete your registration.
             </Alert>
 
-            {event.customFields && event.customFields.length > 0 ? (
+            {eventCustomFields.length > 0 ? (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {event.customFields.map((field, index) => (
+                {eventCustomFields.map((field, index) => (
                   <Box key={index}>{renderCustomField(field)}</Box>
                 ))}
               </Box>

@@ -34,7 +34,7 @@ router.patch(
 );
 
 // ── Password Reset Requests ──
-router.get("/password-reset-requests", protect, authorize("admin"), getPasswordResetRequests);
+router.get("/password-requests", protect, authorize("admin"), getPasswordResetRequests);
 router.patch(
   "/password-reset-requests/:organizerId/:requestId",
   protect,

@@ -10,6 +10,7 @@ import participantRoutes from "./routes/participantRoutes.js";
 import registrationRoutes from "./routes/registrationRoutes.js";
 import organizerEventRoutes from "./routes/organizerEventRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
+import discussionRoutes from "./routes/discussionRoutes.js";
 
 
 dotenv.config();
@@ -50,6 +51,7 @@ app.use("/api/organizer", organizerRoutes);
 app.use("/api/participant", participantRoutes);
 app.use("/api/registration", registrationRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/discussions", discussionRoutes);
 
 app.get("/", (req, res) => {
     res.json({ message: "Felicity Event Management API is running" });

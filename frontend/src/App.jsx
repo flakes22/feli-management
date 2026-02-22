@@ -21,6 +21,7 @@ import OrganizerProfile from "./pages/OrganizerProfile";
 import CreateEvent from "./pages/CreateEvent";
 import OngoingEvents from "./pages/OngoingEvents";
 import ManageOrganizers from "./pages/ManageOrganizers";
+import AttendanceScanner from "./pages/AttendanceScanner";
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
         <Route path="/organizer/profile" element={<OrganizerProfile />}/>
         <Route path="/organizer/create-event" element={<CreateEvent />}/>
         <Route path="/organizer/ongoing" element={<OngoingEvents />}/>
+        <Route path="/organizer/attendance/:eventId" element={<AttendanceScanner />} />
         {/* Admin */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/manage-organizers" element={<ManageOrganizers />} />

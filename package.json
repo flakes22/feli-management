@@ -1,11 +1,11 @@
 {
   "dependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "socket.io": "^4.8.3"
   },
   "scripts": {
-  "client": "npm run dev --prefix frontend",
-  "server": "npm run dev --prefix backend",
-  "dev": "concurrently \"npm run server\" \"npm run client\""
-}
-
+    "client": "npm run dev --prefix frontend",
+    "server": "npm run dev --prefix backend",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  }
 }
