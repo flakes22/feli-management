@@ -29,7 +29,7 @@ connectDB();
 
 const allowedOrigins = [
   "http://localhost:5173",                        // local dev
-  "https://feli-management.vercel.app/",             // your actual Vercel URL
+  "https://feli-management.vercel.app",             // your actual Vercel URL
 ];
 
 app.use(cors({
