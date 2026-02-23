@@ -42,6 +42,25 @@ const getInterestScore = (event, normalizedInterests = []) => {
   return score;
 };
 
+const getClubInterestScore = (club, normalizedInterests = []) => {
+  if (!normalizedInterests.length) return 0;
+
+  const textPool = [
+    club?.name,
+    club?.category,
+    club?.description,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  let score = 0;
+  for (const interest of normalizedInterests) {
+    if (textPool.includes(interest.toLowerCase())) score += 1;
+  }
+  return score;
+};
+
 const isEventOpenForRegistration = (status) => {
   const normalized = String(status || "").toUpperCase();
   return normalized === "PUBLISHED" || normalized === "ONGOING";
@@ -296,6 +315,7 @@ export const getTrendingEvents = async (req, res) => {
 export const getClubs = async (req, res) => {
   try {
     const participant = await Participant.findById(req.user.id);
+    const participantInterests = normalizeInterests(participant?.interests || []);
 
     const clubs = await Organizer.find({ isActive: true }).select(
       "-password -generatedPassword -passwordResetRequest"
@@ -308,12 +328,17 @@ export const getClubs = async (req, res) => {
           .map(id => id.toString())
           .includes(club._id.toString());
 
+        const score = getClubInterestScore(club, participantInterests);
+
         return {
           ...club.toObject(),
-          isFollowing
+          isFollowing,
+          score
         };
       })
     );
+
+    clubsWithStats.sort((a, b) => b.score - a.score);
 
     res.json(clubsWithStats);
 
@@ -477,6 +502,7 @@ export const updateProfile = async (req, res) => {
       contactNumber,
       collegeName,
       interests,
+      followedOrganizers,
     } = req.body;
 
     const participant = await Participant.findById(req.user.id);
@@ -490,6 +516,7 @@ export const updateProfile = async (req, res) => {
     if (contactNumber !== undefined) participant.contactNumber = contactNumber;
     if (collegeName !== undefined) participant.collegeName = collegeName;
     if (interests !== undefined) participant.interests = normalizeInterests(interests);
+    if (followedOrganizers !== undefined) participant.followedOrganizers = followedOrganizers;
     await participant.save();
 
     res.json({ message: "Profile updated successfully" });

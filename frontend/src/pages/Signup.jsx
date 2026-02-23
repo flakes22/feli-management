@@ -38,7 +38,22 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [interestInput, setInterestInput] = useState("");
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [clubs, setClubs] = useState([]);
+  const [followedOrganizers, setFollowedOrganizers] = useState([]);
+  const INTEREST_OPTIONS = [
+    "Coding",
+    "Technology",
+    "Cultural",
+    "Sports",
+    "Arts",
+    "Music",
+    "Dance",
+    "Literature",
+    "Photography",
+    "Business",
+    "Gaming"
+  ];
   const [interests, setInterests] = useState([]);
   const [onboardingSaving, setOnboardingSaving] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
@@ -120,19 +135,30 @@ const Signup = () => {
     }
   };
 
-  const addInterest = () => {
-    const cleaned = interestInput.trim();
-    if (!cleaned) return;
-    if (interests.some((i) => i.toLowerCase() === cleaned.toLowerCase())) {
-      setInterestInput("");
-      return;
-    }
-    setInterests((prev) => [...prev, cleaned]);
-    setInterestInput("");
+  const toggleInterest = (interest) => {
+    setInterests((prev) =>
+      prev.includes(interest)
+        ? prev.filter((i) => i !== interest)
+        : [...prev, interest]
+    );
   };
 
-  const removeInterest = (interestToRemove) => {
-    setInterests((prev) => prev.filter((i) => i !== interestToRemove));
+  const toggleFollow = (clubId) => {
+    setFollowedOrganizers((prev) =>
+      prev.includes(clubId)
+        ? prev.filter((id) => id !== clubId)
+        : [...prev, clubId]
+    );
+  };
+
+  const handleNextStep = async () => {
+    setOnboardingStep(2);
+    try {
+      const res = await API.get("/participant/clubs");
+      setClubs(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch clubs", err);
+    }
   };
 
   const completeOnboarding = async (skip = false) => {
@@ -144,10 +170,10 @@ const Signup = () => {
     setOnboardingSaving(true);
     setError("");
     try {
-      await API.put("/participant/profile", { interests });
+      await API.put("/participant/profile", { interests, followedOrganizers });
       navigate("/participant/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to save interests. You can update them later in Profile.");
+      setError(err.response?.data?.message || "Failed to save preferences. You can update them later in Profile.");
       navigate("/participant/dashboard");
     } finally {
       setOnboardingSaving(false);
@@ -408,63 +434,89 @@ const Signup = () => {
       </Paper>
 
       <Dialog open={onboardingOpen} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Set Your Interests (Optional)</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {onboardingStep === 1 ? "Set Your Interests (Optional)" : "Follow Clubs (Optional)"}
+        </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ color: "#666", mb: 2 }}>
-            Pick areas you like. This helps us personalize event ordering and recommendations.
-          </Typography>
-
-          <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="e.g., AI, Music, Sports, Robotics"
-              value={interestInput}
-              onChange={(e) => setInterestInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addInterest();
-                }
-              }}
-            />
-            <IconButton
-              onClick={addInterest}
-              sx={{ border: "1px solid #673ab7", color: "#673ab7", borderRadius: 2 }}
-            >
-              <AddIcon />
-            </IconButton>
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            {interests.length === 0 ? (
-              <Typography variant="body2" sx={{ color: "#999" }}>
-                No interests selected yet.
+          {onboardingStep === 1 ? (
+            <>
+              <Typography variant="body2" sx={{ color: "#666", mb: 2 }}>
+                Pick areas you like. This helps us personalize event ordering and recommendations.
               </Typography>
-            ) : (
-              interests.map((interest) => (
-                <Chip
-                  key={interest}
-                  label={interest}
-                  onDelete={() => removeInterest(interest)}
-                  sx={{ bgcolor: "#673ab7", color: "white" }}
-                />
-              ))
-            )}
-          </Box>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+                {INTEREST_OPTIONS.map((option) => {
+                  const selected = interests.includes(option);
+                  return (
+                    <Chip
+                      key={option}
+                      label={option}
+                      onClick={() => toggleInterest(option)}
+                      sx={{
+                        bgcolor: selected ? "#673ab7" : "#e0e0e0",
+                        color: selected ? "white" : "black",
+                        "&:hover": {
+                          bgcolor: selected ? "#5e35b1" : "#d5d5d5",
+                        },
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </>
+          ) : (
+            <>
+              <Typography variant="body2" sx={{ color: "#666", mb: 2 }}>
+                Follow clubs to get their events in your feed.
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+                {clubs.map((club) => {
+                  const selected = followedOrganizers.includes(club._id);
+                  return (
+                    <Chip
+                      key={club._id}
+                      label={club.name}
+                      onClick={() => toggleFollow(club._id)}
+                      sx={{
+                        bgcolor: selected ? "#00897b" : "#e0e0e0",
+                        color: selected ? "white" : "black",
+                        "&:hover": {
+                          bgcolor: selected ? "#00796b" : "#d5d5d5",
+                        },
+                      }}
+                    />
+                  );
+                })}
+                {clubs.length === 0 && (
+                  <Typography variant="body2" sx={{ color: "#999" }}>
+                    No clubs found.
+                  </Typography>
+                )}
+              </Box>
+            </>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => completeOnboarding(true)} sx={{ textTransform: "none", color: "#666" }}>
             Skip for now
           </Button>
-          <Button
-            variant="contained"
-            disabled={onboardingSaving}
-            onClick={() => completeOnboarding(false)}
-            sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#673ab7", "&:hover": { bgcolor: "#5e35b1" } }}
-          >
-            {onboardingSaving ? "Saving..." : "Save & Continue"}
-          </Button>
+          {onboardingStep === 1 ? (
+            <Button
+              variant="contained"
+              onClick={handleNextStep}
+              sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#673ab7", "&:hover": { bgcolor: "#5e35b1" } }}
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              disabled={onboardingSaving}
+              onClick={() => completeOnboarding(false)}
+              sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#673ab7", "&:hover": { bgcolor: "#5e35b1" } }}
+            >
+              {onboardingSaving ? "Saving..." : "Save & Continue"}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

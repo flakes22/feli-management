@@ -23,6 +23,20 @@ import CloseIcon from "@mui/icons-material/Close";
 import API from "../services/api";
 import ParticipantNavbar from "../components/ParticipantNavbar";
 
+const INTEREST_OPTIONS = [
+  "Coding",
+  "Technology",
+  "Cultural",
+  "Sports",
+  "Arts",
+  "Music",
+  "Dance",
+  "Literature",
+  "Photography",
+  "Business",
+  "Gaming"
+];
+
 const ParticipantProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +50,6 @@ const ParticipantProfile = () => {
   const [contactNumber, setContactNumber] = useState("");
   const [collegeName, setCollegeName] = useState("");
   const [interests, setInterests] = useState([]);
-  const [newInterest, setNewInterest] = useState("");
 
   // Password change dialog
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -121,23 +134,13 @@ const ParticipantProfile = () => {
     setError("");
   };
 
-  const handleAddInterest = () => {
-    const trimmed = newInterest.trim();
-    if (trimmed && !interests.includes(trimmed)) {
-      setInterests([...interests, trimmed]);
-      setNewInterest("");
-    }
-  };
-
-  const handleRemoveInterest = (interest) => {
-    setInterests(interests.filter((i) => i !== interest));
-  };
-
-  const handleInterestKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAddInterest();
-    }
+  const toggleInterest = (interest) => {
+    if (!editMode) return;
+    setInterests(
+      interests.includes(interest)
+        ? interests.filter((i) => i !== interest)
+        : [...interests, interest]
+    );
   };
 
   const handleUnfollow = async (organizerId) => {
@@ -477,53 +480,33 @@ const ParticipantProfile = () => {
           </Typography>
 
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
-            {interests.length === 0 && (
+            {INTEREST_OPTIONS.map((option) => {
+              const selected = interests.includes(option);
+              if (!editMode && !selected) return null; // Only show selected interests in view mode
+
+              return (
+                <Chip
+                  key={option}
+                  label={option}
+                  onClick={editMode ? () => toggleInterest(option) : undefined}
+                  sx={{
+                    bgcolor: selected ? "#673ab7" : "#e0e0e0",
+                    color: selected ? "white" : "black",
+                    fontWeight: 600,
+                    fontSize: "0.9rem",
+                    "&:hover": {
+                      bgcolor: editMode ? (selected ? "#5e35b1" : "#d5d5d5") : (selected ? "#673ab7" : "#e0e0e0"),
+                    },
+                  }}
+                />
+              );
+            })}
+            {!editMode && interests.length === 0 && (
               <Typography variant="body2" sx={{ color: "#999" }}>
-                No interests added yet.
+                No interests selected.
               </Typography>
             )}
-            {interests.map((interest, idx) => (
-              <Chip
-                key={idx}
-                label={interest}
-                onDelete={editMode ? () => handleRemoveInterest(interest) : undefined}
-                sx={{
-                  bgcolor: "#673ab7",
-                  color: "white",
-                  fontWeight: 600,
-                  fontSize: "0.9rem",
-                  "& .MuiChip-deleteIcon": { color: "white" },
-                }}
-              />
-            ))}
           </Box>
-
-          {editMode && (
-            <Box sx={{ display: "flex", gap: 1 }}>
-              <TextField
-                size="small"
-                placeholder="Add an interest (e.g., Music, Tech, Sports)"
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                onKeyDown={handleInterestKeyDown}
-                sx={{ flex: 1 }}
-              />
-              <Button
-                variant="outlined"
-                onClick={handleAddInterest}
-                disabled={!newInterest.trim()}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  borderColor: "#673ab7",
-                  color: "#673ab7",
-                  "&:hover": { borderColor: "#5e35b1", bgcolor: "rgba(103, 58, 183, 0.04)" },
-                }}
-              >
-                <AddIcon sx={{ fontSize: "1.2rem" }} />
-              </Button>
-            </Box>
-          )}
         </Paper>
 
         {/* Followed Clubs */}
