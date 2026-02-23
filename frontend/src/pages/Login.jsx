@@ -23,9 +23,24 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
 
+  const handleRoleChange = (e) => {
+    const newRole = e.target.value;
+    setRole(newRole);
+    if (newRole === "admin") {
+      setEmail("admin@felicity.com");
+    } else {
+      setEmail("");
+    }
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       alert("Please fill in all fields");
+      return;
+    }
+
+    if (role === "organizer" && !email.endsWith("felicity.com")) {
+      alert("Organizers must use a @felicity.com login email");
       return;
     }
 
@@ -122,7 +137,7 @@ const Login = () => {
           select
           fullWidth
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={handleRoleChange}
           size="small"
           sx={{ mb: 2.5 }}
         >

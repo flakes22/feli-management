@@ -137,7 +137,7 @@ export const registerParticipant = async (req, res) => {
 // Login
 export const login = async (req, res) => {
   try {
-    const { email, password, captchaToken } = req.body;
+    const { email, password, role, captchaToken } = req.body;
 
     const isValidCaptcha = await verifyCaptcha(captchaToken);
     if (!isValidCaptcha) {
@@ -146,21 +146,21 @@ export const login = async (req, res) => {
       });
     }
 
-    let user = await Participant.findOne({ email });
+    let user = null;
 
-    if (!user) {
+    if (role === "participant") {
+      user = await Participant.findOne({ email });
+    } else if (role === "organizer") {
       user = await Organizer.findOne({
         $or: [{ loginEmail: email }, { email }],
       });
-    }
-
-    if (!user) {
+    } else if (role === "admin") {
       user = await Admin.findOne({ email });
     }
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid credentials",
+        message: `Invalid credentials for ${role}`,
       });
     }
 

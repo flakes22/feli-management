@@ -309,6 +309,7 @@ const OrganizerProfile = () => {
   const [twitter, setTwitter] = useState("");
   const [instagram, setInstagram] = useState("");
   const [linkedin, setLinkedin] = useState("");
+  const [discordWebhook, setDiscordWebhook] = useState("");
 
   const fetchProfile = async () => {
     try {
@@ -324,6 +325,7 @@ const OrganizerProfile = () => {
       setTwitter(organizer.socialMedia?.twitter || "");
       setInstagram(organizer.socialMedia?.instagram || "");
       setLinkedin(organizer.socialMedia?.linkedin || "");
+      setDiscordWebhook(organizer.discordWebhook || "");
     } catch (err) {
       setError("Failed to load profile");
     } finally {
@@ -344,6 +346,7 @@ const OrganizerProfile = () => {
         contactPhone,
         website,
         socialMedia: { twitter, instagram, linkedin },
+        discordWebhook,
       });
       setSuccess("Profile updated successfully!");
       setEditMode(false);
@@ -362,6 +365,7 @@ const OrganizerProfile = () => {
     setTwitter(profile?.socialMedia?.twitter || "");
     setInstagram(profile?.socialMedia?.instagram || "");
     setLinkedin(profile?.socialMedia?.linkedin || "");
+    setDiscordWebhook(profile?.discordWebhook || "");
     setEditMode(false);
     setError("");
   };
@@ -481,6 +485,28 @@ const OrganizerProfile = () => {
                 value={profile?.email || ""} disabled
                 sx={{ bgcolor: "#f5f5f5", "& .MuiInputBase-input.Mui-disabled": { WebkitTextFillColor: "#888" } }}
               />
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {/* Integrations */}
+        <Paper elevation={0} sx={{ border: "1px solid #e0e0e0", borderRadius: 3, p: 4, mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 3 }}>
+            Integrations
+          </Typography>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}>
+                Discord Webhook URL
+              </Typography>
+              <TextField fullWidth size="small"
+                value={discordWebhook} onChange={(e) => setDiscordWebhook(e.target.value)}
+                disabled={!editMode} placeholder="https://discord.com/api/webhooks/..."
+                sx={!editMode ? { bgcolor: "#f5f5f5" } : {}}
+              />
+              <Typography variant="caption" sx={{ color: "#888", display: "block", mt: 0.5 }}>
+                We'll automatically post a message to this channel whenever you publish a new event.
+              </Typography>
             </Grid>
           </Grid>
         </Paper>

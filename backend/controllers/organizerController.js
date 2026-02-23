@@ -194,6 +194,38 @@ export const publishEvent = async (req, res) => {
       return res.status(400).json({ message: "Only draft events can be published." });
     event.status = "PUBLISHED";
     await event.save();
+
+    // Check for Discord webhook
+    const organizer = await Organizer.findById(organizerId);
+    if (organizer && organizer.discordWebhook) {
+      const typeLabel = event.type === "MERCH" ? "👕 Merchandise Drop" : "🎪 New Event";
+      try {
+        await fetch(organizer.discordWebhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: `📢 **${organizer.name}** just published a new event!`,
+            embeds: [
+              {
+                title: `✨ ${event.name}`,
+                description: event.description || "No description provided.",
+                color: 6765299, // Purple-ish
+                fields: [
+                  { name: "Type", value: typeLabel, inline: true },
+                  { name: "Start Date", value: event.startDate ? new Date(event.startDate).toDateString() : "TBA", inline: true },
+                  { name: "Registration Fee", value: event.registrationFee > 0 ? `₹${event.registrationFee}` : "Free", inline: true }
+                ],
+                footer: { text: "Published via Felicity Management Portal" },
+                timestamp: new Date()
+              }
+            ]
+          })
+        });
+      } catch (err) {
+        console.error("Discord webhook failed:", err.message);
+      }
+    }
+
     res.json({ message: "Event published successfully", event });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -255,11 +287,11 @@ export const updateOrganizerProfile = async (req, res) => {
   try {
     const {
       description, establishedYear, memberCount,
-      contactPhone, website, socialMedia,
+      contactPhone, website, socialMedia, discordWebhook
     } = req.body;
     const organizer = await Organizer.findByIdAndUpdate(
       req.user.id,
-      { description, establishedYear, memberCount, contactPhone, website, socialMedia },
+      { description, establishedYear, memberCount, contactPhone, website, socialMedia, discordWebhook },
       { new: true }
     ).select("-password");
     if (!organizer) return res.status(404).json({ message: "Organizer not found" });

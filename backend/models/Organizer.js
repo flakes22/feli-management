@@ -35,6 +35,7 @@ const organizerSchema = new mongoose.Schema(
       linkedin: { type: String, default: "" },
     },
     isActive: { type: Boolean, default: true },
+    discordWebhook: { type: String, default: "" },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Participant" }],
     passwordResetRequests: [passwordResetRequestSchema],
     role: { type: String, default: "organizer" },

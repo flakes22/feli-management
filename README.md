@@ -31,36 +31,37 @@ This is a comprehensive full-stack web application designed for managing events,
 
 ## Advanced Features Implemented
 
-### 1. Personalized Recommendations System (Algorithmic Feed)
-**Description:** The application features a dynamic feed that heavily prioritizes matching user interests against event and club attributes. Instead of basic filtering, the system acts as a personalized recommendation engine. 
-**Justification & Design Choices:**
-- Participants who sign up can declare multi-select interests. A scoring algorithm parses out text from an event's tags, description, name, and the organizer's category and aggregates points matching the user's declared interests.
-- This creates an immersive, personalized dashboard, encouraging user engagement.
-- Technical decision: The scoring logic is implemented entirely at the backend layer `getInterestScore` mapping. This ensures ranking integrity and offloads processing from client devices, allowing the server to sort and paginate the response effectively.
+As per the requirements spanning Tier A, Tier B, and Tier C, the following 5 advanced features have been fully implemented into the system:
 
-### 2. Custom Dynamic Form Builder for Event Registrations
-**Description:** Organizers are no longer confined to static registration schemas. They can create dynamic sub-forms per event, specifying different field types (Dropdown, Required, Textbox, Checkboxes).
-**Justification & Design Choices:**
-- Every event has different requirements. Non-technical events might need t-shirt sizes, while coding competitions might need GitHub URLs. Hardcoding these in the schema is a poor technical decision.
-- Technical decision: We implemented a `customFormSchema` populated within the primary Event Schema via Mongoose. The frontend parses this schema and dynamically renders localized React Form components depending on the field's meta-properties, collecting responses effectively within a flexible MongoDB Document array.
+### 1. Merchandise Payment Approval Workflow (Tier A)
+**Description:** Implement a payment verification system for merchandise purchases. Users upload a payment proof (image) after placing an order, entering a "Pending Approval" state. Organizers can view a separate tab with all orders showing uploaded payment proofs, approve/reject them, decrement stock, and automatically dispatch QR tickets upon approval.
+**Justification & Design Choices:** 
+- Ensures correct audit trailing and verification of manual payments before committing limited stock. It completely avoids the scenario of fake/unpaid orders monopolizing the merchandising inventory.
+- **Technical decision:** We reused the core `Registration` schema and dynamically shifted states via `paymentProof` and `paymentStatus` properties. Heavy business logic (stock decrement, QR generation, grid-email dispatch) is decoupled from the participant purchase and isolated securely inside the organizer's approval mutation route, preventing any client-side tampering of inventory logic.
 
-### 3. Real-Time Socket Integrations
-**Description:** Real-time updates delivered concurrently to clients using WebSockets.
-**Justification & Design Choices:**
-- Important for scenarios like registration limits nearing capacity or time-critical updates by Admins. Standard periodic HTTP polling places too much strain on the database.
-- Technical decision: Integrated `socket.io`. Websockets significantly lower the network footprint and latency compared to standard REST pooling, ensuring robust real-time synchronization.
+### 2. QR Scanner & Attendance Tracking (Tier A)
+**Description:** Built-in QR Code scanner for organizers to validate tickets during events natively using a device camera, alongside attendance synchronization, duplicate scan rejections, and manual override tracking.
+**Justification & Design Choices:** 
+- Greatly accelerates event entry management on the ground and completely mitigates fraudulent or duplicate paper-ticket usage, bringing the platform up to the standards of modern ticketing apps.
+- **Technical decision:** Implemented `html5-qrcode` on the React frontend to interface directly with the device's hardware camera. The QR data payload contains stringified JSON corresponding to the unique database ObjectIds, which are mapped cleanly by a dedicated backend attendance controller that enforces validation constraints before immutably stamping the `attendanceMarked` boolean flag.
 
-### 4. Automated Ticketing & QR Check-ins
-**Description:** Upon registration, the backend automatically generates a virtual QR ticket and manages digital entry validation via webcam scanning at the frontend interface using `html5-qrcode`.
-**Justification & Design Choices:**
-- Decreases check-in friction by 90% during live event management.
-- Technical decision: Instead of storing image binaries of QR codes to a database, we compute the base64 or link URLs functionally (`qrcode` module). We integrated `html5-qrcode` to interface directly with client hardware to scan these generated payloads, triggering an isolated check-in API request when successfully resolved. 
+### 3. Real-Time Discussion Forum (Tier B)
+**Description:** Real-time discussion forum embedded on the Event Details page allowing registered participants to post messages and organizers to moderate, post announcements, and respond in real-time.
+**Justification & Design Choices:** 
+- Promotes high engagement and drastically cuts down on external chat groups (WhatsApp, Discord) becoming fractured or losing important context. It keeps event-specific communication tightly coupled to the actual event listing.
+- **Technical decision:** Powered fundamentally by WebSockets using `Socket.io`. Standard HTTP periodic polling is deeply inefficient for chat; the bidirectional persistent socket channel ensures sub-second broadcast rendering for all connected users simultaneously without overwhelming the database with continuous read queries. MongoDB persists the chat history so late-joiners can hydrate the chat state.
 
-### 5. Bot Protection via Google ReCAPTCHA
-**Description:** Ensures interactions originating from signup endpoints and login portals are generated by actual users.
-**Justification & Design Choices:**
-- Crucial for mitigating DDOS attacks, malicious DB flooding, or credential stuffing.
-- Technical decision: A frontend implementation handles user-facing challenges, resolving a token that is transmitted down to the backend. The backend acts as the true arbiter, verifying this specific token against the secret ReCaptcha endpoint via TLS before evaluating the request.
+### 4. Organizer Password Reset Workflow (Tier B)
+**Description:** A complete password reset ecosystem for organizers. Organizers request a reset; Admin views requests via a central dashboard, adds notes, and approves/rejects them. Upon approval, the system auto-generates a secure new password for the Admin to share out-of-band.
+**Justification & Design Choices:** 
+- Provides an extremely robust, centralized administrative security workflow. By preventing organizers from executing arbitrary password resets unmonitored, it forces authentication oversight strictly back to the system Admin, mitigating internal hijacking during organizer handovers.
+- **Technical decision:** Bypassed reliance on external SMTP/email-magic-link OTP flows by storing an embedded `passwordResetRequests` subdocument array natively inside the `Organizer` Mongoose model. Upon an Admin approval trigger (`updateOne` bypass to avoid strict validation errors), the backend issues a cryptographically secure random password utilizing Node's native `crypto` utility.
+
+### 5. Bot Protection (Tier C)
+**Description:** CAPTCHA verification strictly enforced on all public authentication routes (login and participant registration).
+**Justification & Design Choices:** 
+- An absolute necessity for any public-facing form. Crucial for mitigating DDoS payload attacks, malicious database flooding with fake accounts, and automated credential stuffing.
+- **Technical decision:** Integrated `react-google-recaptcha`. The React frontend handles the localized user-facing visual challenge, generating a temporary token. Crucially, the Node backend acts as the true zero-trust arbiter, intercepting the auth controller pipeline to independently verify this specific token against Google's secret `siteverify` TLS endpoint before processing any data schemas.
 
 ## Database Architecture & Additional Attributes Justification
 
