@@ -74,7 +74,7 @@ const MerchOrders = () => {
     };
 
     const openProof = (proofPath) => {
-        const backendUrl = "http://localhost:5001"; // should use env var ideally, simplifying here
+        const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace("/api", "") : "http://localhost:5001";
         setCurrentProof(`${backendUrl}/${proofPath}`);
         setViewProofOpen(true);
     };
