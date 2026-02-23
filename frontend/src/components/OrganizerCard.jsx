@@ -3,10 +3,12 @@ import API from "../services/api";
 
 const OrganizerCard = ({ organizer, refresh }) => {
   const toggleStatus = async () => {
-    await API.patch(
-      `/admin/toggle-organizer/${organizer._id}`
-    );
-    refresh();
+    try {
+      await API.patch(`/admin/toggle-organizer/${organizer._id}`);
+      refresh();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message);
+    }
   };
 
   return (

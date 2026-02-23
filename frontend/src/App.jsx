@@ -23,6 +23,7 @@ import OngoingEvents from "./pages/OngoingEvents";
 import ManageOrganizers from "./pages/ManageOrganizers";
 import AttendanceScanner from "./pages/AttendanceScanner";
 import MerchOrders from "./pages/MerchOrders";
+import PasswordResetRequests from "./pages/PasswordResetRequests";
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
         {/* Admin */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/manage-organizers" element={<ManageOrganizers />} />
+        <Route path="/admin/password-requests" element={<PasswordResetRequests />} />
       </Routes>
     </Router>
   );

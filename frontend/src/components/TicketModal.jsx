@@ -99,7 +99,7 @@ const TicketModal = ({ open, onClose, registration }) => {
         <Divider sx={{ mb: 2 }} />
 
         {/* QR Code */}
-        {registration.qrCode && (
+        {registration.qrCode ? (
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="body2" sx={{ color: "#888", mb: 1 }}>
               Scan QR at entry
@@ -110,7 +110,16 @@ const TicketModal = ({ open, onClose, registration }) => {
               style={{ width: 180, height: 180 }}
             />
           </Box>
-        )}
+        ) : registration.paymentStatus === "PENDING" ? (
+          <Box sx={{ textAlign: "center", p: 2, bgcolor: "#fff3e0", borderRadius: 2, mt: 2 }}>
+            <Typography variant="body2" sx={{ color: "#ed6c02", fontWeight: 600, mb: 0.5 }}>
+              Payment Under Review
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#ed6c02" }}>
+              Your QR ticket will be available here once approved by the organizer.
+            </Typography>
+          </Box>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

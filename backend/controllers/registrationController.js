@@ -208,6 +208,7 @@ export const purchaseMerch = async (req, res) => {
     const ticketNumber = `MERCH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
     // Status is PENDING. Wait for organizer approval to generate QR and send email.
+    // Stock will be decremented, QR generated, and email sent UPON APPROVAL.
     const registration = new Registration({
       participantId,
       eventId,
@@ -218,11 +219,6 @@ export const purchaseMerch = async (req, res) => {
       customFieldResponses: customFieldResponses || [],
     });
     await registration.save();
-
-    if (event.stock !== undefined) {
-      event.stock -= 1;
-      await event.save();
-    }
 
     res.status(201).json({
       message: "Purchase submitted! Pending organizer approval.",
@@ -254,17 +250,29 @@ export const getParticipantDashboard = async (req, res) => {
     const upcoming = registrations.filter(
       (reg) =>
         reg.eventId &&
-        reg.status === "REGISTERED" &&
-        new Date(reg.eventId.startDate) >= new Date()
+        ['REGISTERED', 'PENDING'].includes(reg.status) &&
+        (!reg.eventId.startDate || new Date(reg.eventId.startDate) >= new Date())
     );
 
-    const past = registrations.filter(
+    const normal = registrations.filter(
+      (reg) => reg.eventId && reg.eventId.type === "NORMAL"
+    );
+
+    const merchandise = registrations.filter(
+      (reg) => reg.eventId && reg.eventId.type === "MERCH"
+    );
+
+    const completed = registrations.filter(
       (reg) =>
         reg.eventId &&
-        (reg.status === "ATTENDED" || new Date(reg.eventId.endDate) < new Date())
+        (reg.status === "ATTENDED" || (reg.eventId.endDate && new Date(reg.eventId.endDate) < new Date()))
     );
 
-    res.json({ upcoming, past });
+    const cancelled = registrations.filter(
+      (reg) => reg.status === "CANCELLED" || reg.status === "REJECTED"
+    );
+
+    res.json({ upcoming, normal, merchandise, completed, cancelled });
   } catch (err) {
     console.error("getParticipantDashboard error:", err);
     res.status(500).json({ message: "Server error" });

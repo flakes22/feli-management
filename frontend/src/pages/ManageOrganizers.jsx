@@ -50,8 +50,13 @@ const ManageOrganizers = () => {
   };
 
   const handleToggle = async (id) => {
-    await API.patch(`/admin/toggle-organizer/${id}`);
-    fetchOrganizers();
+    try {
+      await API.patch(`/admin/toggle-organizer/${id}`);
+      fetchOrganizers();
+    } catch (e) {
+      console.error(e.response ? e.response.data : e.message);
+      alert(e.response ? e.response.data.message : e.message);
+    }
   };
 
   const handleDelete = async (id) => {

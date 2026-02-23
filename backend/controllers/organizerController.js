@@ -472,12 +472,6 @@ export const updateMerchOrderStatus = async (req, res) => {
     if (status === "REJECTED") {
       registration.status = "REJECTED";
       await registration.save();
-
-      if (event.stock !== undefined) {
-        event.stock += 1;
-        await event.save();
-      }
-
       return res.json({ message: "Order rejected", registration });
     }
 
@@ -493,6 +487,14 @@ export const updateMerchOrderStatus = async (req, res) => {
       registration.qrCode = qrCode;
 
       event.registrationCount = (event.registrationCount || 0) + 1;
+
+      // Decrement stock ONLY upon approval
+      if (event.stock !== undefined) {
+        if (event.stock <= 0) {
+          return res.status(400).json({ message: "Unfortunately, this item is out of stock." });
+        }
+        event.stock -= 1;
+      }
 
       await registration.save();
       await event.save();

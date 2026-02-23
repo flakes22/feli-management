@@ -7,94 +7,96 @@ import Registration from "../models/Registration.js";
 
 // Create an organizer
 export const createOrganizer = async (req, res) => {
-    try {
-      const { name, category, description, contactEmail } = req.body;
-  
-      if (!name || !contactEmail) {
-        return res.status(400).json({
-          message: "Name and Contact Email are required",
-        });
-      }
-  
-      // Auto-generate login email
-      const loginEmail =
-        name.toLowerCase().replace(/\s+/g, "") + "@felicity.com";
-  
-      const existing = await Organizer.findOne({
-        $or: [{ email: contactEmail }, { loginEmail }],
+  try {
+    const { name, category, description, contactEmail } = req.body;
+
+    if (!name || !contactEmail) {
+      return res.status(400).json({
+        message: "Name and Contact Email are required",
       });
-      if (existing) {
-        return res.status(400).json({
-          message: "Organizer already exists (email or login email in use)",
-        });
-      }
-  
-      // Generate random password
-      const plainPassword = crypto
-        .randomBytes(6)
-        .toString("hex");
-  
-      const organizer = await Organizer.create({
-        name,
-        category,
-        description,
-        email: contactEmail,
-        loginEmail,
-        // Keep plain here; Organizer pre-save hook hashes once.
-        password: plainPassword,
-      });
-  
-      res.status(201).json({
-        message: "Organizer created successfully",
-        organizer: {
-          id: organizer._id,
-          name: organizer.name,
-          loginEmail: organizer.loginEmail,
-          generatedPassword: plainPassword, // Admin shares this
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
     }
-  };
+
+    // Auto-generate login email
+    const loginEmail =
+      name.toLowerCase().replace(/\s+/g, "") + "@felicity.com";
+
+    const existing = await Organizer.findOne({
+      $or: [{ email: contactEmail }, { loginEmail }],
+    });
+    if (existing) {
+      return res.status(400).json({
+        message: "Organizer already exists (email or login email in use)",
+      });
+    }
+
+    // Generate random password
+    const plainPassword = crypto
+      .randomBytes(6)
+      .toString("hex");
+
+    const organizer = await Organizer.create({
+      name,
+      category,
+      description,
+      email: contactEmail,
+      loginEmail,
+      // Keep plain here; Organizer pre-save hook hashes once.
+      password: plainPassword,
+    });
+
+    res.status(201).json({
+      message: "Organizer created successfully",
+      organizer: {
+        id: organizer._id,
+        name: organizer.name,
+        loginEmail: organizer.loginEmail,
+        generatedPassword: plainPassword, // Admin shares this
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Get all the organizers
 export const getAllOrganizers = async (req, res) => {
-    try {
-      const organizers = await Organizer.find().select(
-        "-password"
-      );
-      res.json(organizers);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
+  try {
+    const organizers = await Organizer.find().select(
+      "-password"
+    );
+    res.json(organizers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // Disable organizer
 
 export const toggleOrganizerStatus = async (req, res) => {
-    try {
-      const { id } = req.params;
-  
-      const organizer = await Organizer.findById(id);
-  
-      if (!organizer) {
-        return res.status(404).json({
-          message: "Organizer not found",
-        });
-      }
-      organizer.isActive = !organizer.isActive;
-      await organizer.save();
-  
-      res.json({
-        message: `Organizer ${
-          organizer.isActive ? "Enabled" : "Disabled"
-        } successfully`,
+  try {
+    const { id } = req.params;
+
+    const organizer = await Organizer.findById(id);
+
+    if (!organizer) {
+      return res.status(404).json({
+        message: "Organizer not found",
       });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
     }
-  };
+    organizer.isActive = !organizer.isActive;
+    await Organizer.updateOne(
+      { _id: id },
+      { $set: { isActive: organizer.isActive } }
+    );
+
+    res.json({
+      message: `Organizer ${organizer.isActive ? "Enabled" : "Disabled"
+        } successfully`,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // ── Get All Password Reset Requests ──
 export const getPasswordResetRequests = async (req, res) => {

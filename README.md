@@ -62,6 +62,29 @@ This is a comprehensive full-stack web application designed for managing events,
 - Crucial for mitigating DDOS attacks, malicious DB flooding, or credential stuffing.
 - Technical decision: A frontend implementation handles user-facing challenges, resolving a token that is transmitted down to the backend. The backend acts as the true arbiter, verifying this specific token against the secret ReCaptcha endpoint via TLS before evaluating the request.
 
+## Database Architecture & Additional Attributes Justification
+
+To facilitate our advanced features and properly abstract the intricate reality of event management, several significant additional attributes were incorporated into the MongoDB Mongoose Schemas beyond basic structural logic:
+
+### Participant Schema
+- **`participantType` (`Enum: IIIT, NON_IIIT`) & `collegeName`**: Essential for segregation logic. Internal users can be verified automatically (by regexing against `@students.iiit.ac.in`), whereas external participants can document their external institutional representation.
+- **`interests` (`Array`)**: The linchpin for the *Algorithmic Feed*. It captures defined categories chosen by the user during onboarding which the backend cross-references to calculate match scores against specific events/clubs.
+- **`followedOrganizers` (`Array of ObjectIds`)**: Enables the follower network. Instead of creating a whole interconnecting relationship collection, we embed this array functionally in the Participant schema to natively allow "Show Followed Club Events Only" mapping queries.
+
+### Organizer Schema
+- **`category`**: Defines the archetype of the club (e.g., Cultural, Technical). This is passed down onto their respective events, allowing for powerful macro-filtering via the participant dashboard.
+- **`establishedYear`, `memberCount`, `socialMedia` (`Object`)**: Extended bio fields. Since Organizer profiles essentially act as "Club Pages," robust social mapping and historical attributes validate the organization to wandering participants browsing for domains.
+- **`isActive` (`Boolean`)**: A critical administrative kill-switch. Rather than permanently deleting organizers (and thereby breaking referential integrity in existing registrations or past events), a toggle allows Admins to suspend organizers dynamically.
+
+### Event Schema
+- **`customForm` (`customFormSchema` embedded sub-document)**: Instead of locking events into monolithic, static schemas, or creating hundreds of isolated tables per event, the main event schema acts as a dynamically serialized definition of *other schemas*. It dictates field labels, formats (dropdown vs textarea), and requirements—significantly scaling the flexibility of event-hosting.
+- **`type` (`Enum: NORMAL, MERCH`) & `variants/stock`**: By extending a normal ticketing event to encapsulate Merchandise sales (with variables like t-shirt sizes, multi-stock counts, and separate payment validations) inside the same model, we massively reduce infrastructure duplication.
+
+### Registration Schema
+- **`qrCode` & `ticketNumber` (`String`)**: Uniquely generated payload signatures assigned after registration processing. These act directly as virtual access passes physically scanned at checkpoints.
+- **`attendanceMarked` (`Boolean`), `attendanceTime` (`Date`), `attendanceMarkedBy` (`ObjectId`)**: These temporal and boolean flags operate in synchronization with the QR endpoint. When a QR is scanned via device, the backend validates the token and immutably sets these, establishing the chain of custody for attendance on event day.
+- **`paymentProof` & `paymentStatus` (`Enum: PENDING, APPROVED, REJECTED`)**: Required primarily for `MERCH` registration pathways, acting as a verifiable staging area where admins can validate manual transfers before formally activating the ticket block natively alongside regular free registrations.
+
 ---
 
 ## Setup and Installation Instructions

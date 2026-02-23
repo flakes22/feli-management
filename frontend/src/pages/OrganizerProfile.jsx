@@ -105,14 +105,14 @@ const PasswordResetSection = () => {
               status.status === "APPROVED"
                 ? "#a5d6a7"
                 : status.status === "REJECTED"
-                ? "#ef9a9a"
-                : "#ffe082",
+                  ? "#ef9a9a"
+                  : "#ffe082",
             bgcolor:
               status.status === "APPROVED"
                 ? "#f1f8f1"
                 : status.status === "REJECTED"
-                ? "#fff5f5"
-                : "#fffde7",
+                  ? "#fff5f5"
+                  : "#fffde7",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
@@ -128,14 +128,14 @@ const PasswordResetSection = () => {
                   status.status === "APPROVED"
                     ? "#e8f5e9"
                     : status.status === "REJECTED"
-                    ? "#ffebee"
-                    : "#fff3e0",
+                      ? "#ffebee"
+                      : "#fff3e0",
                 color:
                   status.status === "APPROVED"
                     ? "#2e7d32"
                     : status.status === "REJECTED"
-                    ? "#c62828"
-                    : "#e65100",
+                      ? "#c62828"
+                      : "#e65100",
               }}
             />
           </Box>

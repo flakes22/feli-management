@@ -89,16 +89,37 @@ const EventCard = ({ registration, onViewTicket }) => {
               )}
             </Box>
 
-            <Typography variant="body2" sx={{ color: "#666" }}>
-              Status:{" "}
-              <Chip
-                label={getStatusLabel(registration.status)}
-                size="small"
-                color={getStatusColor(registration.status)}
-                variant="outlined"
-                sx={{ fontWeight: 600, fontSize: "0.75rem" }}
-              />
-            </Typography>
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+              <Typography variant="body2" sx={{ color: "#666" }}>
+                Status:{" "}
+                <Chip
+                  label={getStatusLabel(registration.status)}
+                  size="small"
+                  color={getStatusColor(registration.status)}
+                  variant="outlined"
+                  sx={{ fontWeight: 600, fontSize: "0.75rem" }}
+                />
+              </Typography>
+
+              {registration.paymentStatus && (
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  Payment:{" "}
+                  <Chip
+                    label={registration.paymentStatus}
+                    size="small"
+                    color={
+                      registration.paymentStatus === "APPROVED"
+                        ? "success"
+                        : registration.paymentStatus === "REJECTED"
+                          ? "error"
+                          : "warning"
+                    }
+                    variant="outlined"
+                    sx={{ fontWeight: 600, fontSize: "0.75rem" }}
+                  />
+                </Typography>
+              )}
+            </Box>
           </Box>
 
           {/* Right Section */}
