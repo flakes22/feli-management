@@ -23,7 +23,7 @@ const registrationSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["REGISTERED", "ATTENDED", "CANCELLED"],
+      enum: ["PENDING", "REGISTERED", "ATTENDED", "CANCELLED", "REJECTED"],
       default: "REGISTERED",
     },
     attendanceMarked: { type: Boolean, default: false },
@@ -38,6 +38,11 @@ const registrationSchema = new mongoose.Schema(
     // ✅ ticketNumber is unique per ticket but NOT a unique index
     // because multiple registrations exist in the collection
     ticketNumber: { type: String },
+    paymentProof: { type: String }, // For merch payment proofs
+    paymentStatus: {
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+    },
     customFieldResponses: [
       {
         fieldLabel: String,
@@ -68,7 +73,7 @@ registrationSchema.index(
   { participantId: 1, eventId: 1 },
   {
     unique: true,
-    partialFilterExpression: { status: { $in: ["REGISTERED", "ATTENDED"] } },
+    partialFilterExpression: { status: { $in: ["PENDING", "REGISTERED", "ATTENDED"] } },
     name: "unique_active_registration",
   }
 );

@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -15,8 +17,13 @@ import discussionRoutes from "./routes/discussionRoutes.js";
 
 dotenv.config();
 
-const app=express();
-const PORT= process.env.PORT || 5001;
+const app = express();
+const PORT = process.env.PORT || 5001;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 connectDB();
 
@@ -29,7 +36,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
@@ -54,7 +61,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/discussions", discussionRoutes);
 
 app.get("/", (req, res) => {
-    res.json({ message: "Felicity Event Management API is running" });
+  res.json({ message: "Felicity Event Management API is running" });
 });
 
 // Error handling middleware
@@ -63,6 +70,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Something went wrong!" });
 });
 
-app.listen(PORT,()=>{
-    console.log(`Server running on port ${PORT}`)
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
 });

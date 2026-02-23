@@ -64,6 +64,7 @@ const CreateEvent = () => {
   const [registrationDeadline, setRegistrationDeadline] = useState("");
   const [registrationFee, setRegistrationFee] = useState(0);
   const [maxParticipants, setMaxParticipants] = useState("");
+  const [stock, setStock] = useState("");
   const [eligibility, setEligibility] = useState("Open to All");
   const [savedEventId, setSavedEventId] = useState(null);
 
@@ -82,6 +83,8 @@ const CreateEvent = () => {
     if (!registrationDeadline) return "Registration deadline is required.";
     if (new Date(registrationDeadline) > new Date(startDate))
       return "Registration deadline must be before start date.";
+    if (type === "MERCH" && (!stock || Number(stock) <= 0))
+      return "Stock must be explicitly provided for merchandise.";
     return null;
   };
 
@@ -103,6 +106,7 @@ const CreateEvent = () => {
         registrationDeadline,
         registrationFee: Number(registrationFee),
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
+        stock: type === "MERCH" && stock ? Number(stock) : undefined,
         eligibility,
         status: "DRAFT",
       };
@@ -458,6 +462,26 @@ const CreateEvent = () => {
                   placeholder="Unlimited"
                 />
               </Grid>
+
+              {type === "MERCH" && (
+                <Grid item xs={12} md={6}>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 0.5, fontWeight: 600, color: "#666" }}
+                  >
+                    Inventory/Stock *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    size="small"
+                    value={stock}
+                    onChange={(e) => setStock(e.target.value)}
+                    inputProps={{ min: 1 }}
+                    placeholder="E.g. 50"
+                  />
+                </Grid>
+              )}
             </Grid>
 
             {/* Actions */}

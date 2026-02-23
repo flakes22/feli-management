@@ -141,7 +141,7 @@ export const getParticipants = async (req, res) => {
     if (!event)
       return res.status(404).json({ message: "Event not found" });
 
-    if (event.organizerId.toString() !== req.user.id)
+    if (event.organizerId.toString() !== req.user.id.toString())
       return res.status(403).json({ message: "Not your event" });
 
     let filter = { eventId };
@@ -187,7 +187,7 @@ export const exportParticipantsCSV = async (req, res) => {
     if (!event)
       return res.status(404).json({ message: "Event not found" });
 
-    if (event.organizerId.toString() !== req.user.id)
+    if (event.organizerId.toString() !== req.user.id.toString())
       return res.status(403).json({ message: "Not your event" });
 
     const registrations = await Registration.find({

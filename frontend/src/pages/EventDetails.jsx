@@ -71,6 +71,7 @@ const EventDetails = () => {
   const [registerDialog, setRegisterDialog] = useState(false);
   const [customResponses, setCustomResponses] = useState({});
   const [registering, setRegistering] = useState(false);
+  const [paymentProof, setPaymentProof] = useState(null);
 
   const fetchEventDetails = async () => {
     try {
@@ -112,10 +113,27 @@ const EventDetails = () => {
         response: customResponses[label],
       }));
 
-      const res = await API.post("/registration/register", {
-        eventId,
-        customFieldResponses,
-      });
+      let res;
+      if (event.type === "MERCH") {
+        if (!paymentProof) {
+          setError("Payment proof is required for merchandise purchases");
+          setRegistering(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append("eventId", eventId);
+        formData.append("paymentProof", paymentProof);
+        formData.append("customFieldResponses", JSON.stringify(customFieldResponses));
+
+        res = await API.post("/registration/merch", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        res = await API.post("/registration/register", {
+          eventId,
+          customFieldResponses,
+        });
+      }
 
       setSuccess("Registration successful!");
       setTimeout(() => {
@@ -312,7 +330,8 @@ const EventDetails = () => {
 
   const isDeadlinePassed = stats?.isDeadlinePassed || false;
   const isLimitReached = stats?.isLimitReached || false;
-  const canRegister = !isDeadlinePassed && !isLimitReached;
+  const isOutOfStock = event.type === "MERCH" && event.stock <= 0;
+  const canRegister = !isDeadlinePassed && !isLimitReached && !isOutOfStock;
   const eventCustomFields = normalizeCustomFields(event);
 
   return (
@@ -407,6 +426,14 @@ const EventDetails = () => {
                 sx={{ fontWeight: 600 }}
               />
             )}
+
+            {isOutOfStock && !isDeadlinePassed && (
+              <Chip
+                label="Out of Stock"
+                color="error"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
           </Box>
 
           {/* Event Info Grid */}
@@ -482,13 +509,14 @@ const EventDetails = () => {
                 <PeopleIcon sx={{ color: "#673ab7", mr: 1 }} />
                 <Box>
                   <Typography variant="body2" sx={{ color: "#888" }}>
-                    Registrations
+                    {event.type === "MERCH" ? "Available Stock" : "Registrations"}
                   </Typography>
                   <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    {stats?.totalRegs || 0}
-                    {event.registrationLimit
-                      ? ` / ${event.registrationLimit}`
-                      : ""}
+                    {event.type === "MERCH" ? (
+                      event.stock !== undefined ? event.stock : "N/A"
+                    ) : (
+                      <>{stats?.totalRegs || 0}{event.registrationLimit ? ` / ${event.registrationLimit}` : ""}</>
+                    )}
                   </Typography>
                 </Box>
               </Box>
@@ -596,8 +624,22 @@ const EventDetails = () => {
               </Box>
             ) : (
               <Typography sx={{ color: "#666", textAlign: "center", py: 2 }}>
-                No additional information required. Click register to confirm.
+                No additional information required.
               </Typography>
+            )}
+
+            {event.type === "MERCH" && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: "#1a1a2e" }}>
+                  Upload Payment Proof *
+                </Typography>
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/jpg"
+                  onChange={(e) => setPaymentProof(e.target.files[0])}
+                  required
+                />
+              </Box>
             )}
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>

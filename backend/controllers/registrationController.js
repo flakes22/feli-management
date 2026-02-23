@@ -126,11 +126,11 @@ export const registerForEvent = async (req, res) => {
       if (participant?.email) {
         const eventDate = event.startDate
           ? new Date(event.startDate).toLocaleDateString("en-IN", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
           : "TBA";
 
         await sendTicketEmail({
@@ -167,8 +167,25 @@ export const registerForEvent = async (req, res) => {
 // ── Merch Purchase ──
 export const purchaseMerch = async (req, res) => {
   try {
-    const { eventId, customFieldResponses } = req.body;
+    const { eventId } = req.body;
+    let { customFieldResponses } = req.body;
+
+    // Parse customFieldResponses if it comes as a string from multipart form-data
+    if (typeof customFieldResponses === "string") {
+      try {
+        customFieldResponses = JSON.parse(customFieldResponses);
+      } catch (e) {
+        customFieldResponses = [];
+      }
+    }
+
     const participantId = req.user.id;
+
+    // Check if a payment proof was uploaded
+    const paymentProof = req.file ? req.file.path : null;
+    if (!paymentProof) {
+      return res.status(400).json({ message: "Payment proof is required" });
+    }
 
     const event = await Event.findById(eventId);
     if (!event || event.type !== "MERCH")
@@ -186,53 +203,32 @@ export const purchaseMerch = async (req, res) => {
       status: { $ne: "CANCELLED" },
     });
     if (existing)
-      return res.status(400).json({ message: "Already purchased this item" });
+      return res.status(400).json({ message: "Already purchased or pending payment for this item" });
 
     const ticketNumber = `MERCH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    const qrData = JSON.stringify({ eventId, participantId, ticketNumber });
-    const qrCode = await QRCode.toDataURL(qrData);
 
+    // Status is PENDING. Wait for organizer approval to generate QR and send email.
     const registration = new Registration({
       participantId,
       eventId,
-      status: "REGISTERED",
+      status: "PENDING",
+      paymentStatus: "PENDING",
+      paymentProof,
       ticketNumber,
-      qrCode,
       customFieldResponses: customFieldResponses || [],
     });
     await registration.save();
 
-    if (event.stock !== undefined) event.stock -= 1;
-    event.registrationCount = (event.registrationCount || 0) + 1;
-    await event.save();
-
-    // ── Send purchase confirmation email ──
-    try {
-      const participant = await Participant.findById(participantId).select(
-        "firstName lastName email"
-      );
-
-      if (participant?.email) {
-        await sendTicketEmail({
-          toEmail: participant.email,
-          participantName: `${participant.firstName} ${participant.lastName}`,
-          eventName: event.title || event.name,
-          eventDate: "N/A (Merchandise)",
-          eventVenue: "",
-          ticketNumber,
-          qrCodeDataUrl: qrCode,
-        });
-      }
-    } catch (emailErr) {
-      console.error("Merch email failed (purchase still successful):", emailErr.message);
+    if (event.stock !== undefined) {
+      event.stock -= 1;
+      await event.save();
     }
 
     res.status(201).json({
-      message: "Purchase successful! A confirmation email has been sent.",
+      message: "Purchase submitted! Pending organizer approval.",
       registration: {
         _id: registration._id,
         ticketNumber,
-        qrCode,
         status: registration.status,
       },
     });

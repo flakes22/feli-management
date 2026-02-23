@@ -1,7 +1,10 @@
 import Event from "../models/Event.js";
 import Organizer from "../models/Organizer.js";
 import Registration from "../models/Registration.js";
+import Participant from "../models/Participant.js";
 import bcrypt from "bcryptjs";
+import QRCode from "qrcode";
+import { sendTicketEmail } from "../utils/sendEmail.js";
 
 const normalizeCustomFieldsInput = (fields = []) =>
   (fields || []).map((f) => ({
@@ -407,6 +410,113 @@ export const getOrganizerStats = async (req, res) => {
       totalRevenue,
     });
   } catch (error) {
-    res.status (500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ── Merch Orders ──
+export const getMerchOrders = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const organizerId = req.user.id;
+
+    const event = await Event.findById(eventId);
+    if (!event || event.type !== "MERCH") {
+      return res.status(404).json({ message: "Merchandise event not found" });
+    }
+
+    if (event.organizerId.toString() !== organizerId.toString()) {
+      return res.status(403).json({ message: "Not your event" });
+    }
+
+    const orders = await Registration.find({ eventId })
+      .populate("participantId", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateMerchOrderStatus = async (req, res) => {
+  try {
+    const { registrationId } = req.params;
+    const { status } = req.body; // "APPROVED" or "REJECTED"
+    const organizerId = req.user.id;
+
+    if (!["APPROVED", "REJECTED"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const registration = await Registration.findById(registrationId).populate("participantId");
+    if (!registration) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const event = await Event.findById(registration.eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    if (event.organizerId.toString() !== organizerId.toString()) {
+      return res.status(403).json({ message: "Not your event" });
+    }
+
+    if (registration.paymentStatus && registration.paymentStatus !== "PENDING") {
+      return res.status(400).json({ message: `Order is already ${registration.paymentStatus}` });
+    }
+
+    registration.paymentStatus = status;
+
+    if (status === "REJECTED") {
+      registration.status = "REJECTED";
+      await registration.save();
+
+      if (event.stock !== undefined) {
+        event.stock += 1;
+        await event.save();
+      }
+
+      return res.json({ message: "Order rejected", registration });
+    }
+
+    if (status === "APPROVED") {
+      registration.status = "REGISTERED";
+
+      const qrData = JSON.stringify({
+        eventId: event._id,
+        participantId: registration.participantId._id,
+        ticketNumber: registration.ticketNumber
+      });
+      const qrCode = await QRCode.toDataURL(qrData);
+      registration.qrCode = qrCode;
+
+      event.registrationCount = (event.registrationCount || 0) + 1;
+
+      await registration.save();
+      await event.save();
+
+      // Send confirmation email
+      if (registration.participantId && registration.participantId.email) {
+        try {
+          await sendTicketEmail({
+            toEmail: registration.participantId.email,
+            participantName: `${registration.participantId.firstName} ${registration.participantId.lastName}`,
+            eventName: event.title || event.name,
+            eventDate: "N/A (Merchandise)",
+            eventVenue: "",
+            ticketNumber: registration.ticketNumber,
+            qrCodeDataUrl: qrCode,
+          });
+        } catch (emailErr) {
+          console.error("Merch approval email failed:", emailErr.message);
+        }
+      }
+
+      return res.json({ message: "Order approved successfully", registration });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

@@ -13,6 +13,8 @@ import {
   requestPasswordReset,
   getMyPasswordResetStatus,
   applyApprovedPassword,
+  getMerchOrders,
+  updateMerchOrderStatus,
 } from "../controllers/organizerController.js";
 import { protect, authorize } from "../middleware/authMiddleware.js";
 
@@ -32,6 +34,10 @@ router.delete("/events/:eventId", protect, authorize("organizer"), deleteEvent);
 router.get("/profile", protect, authorize("organizer"), getOrganizerProfile);
 router.put("/profile", protect, authorize("organizer"), updateOrganizerProfile);
 router.get("/stats", protect, authorize("organizer"), getOrganizerStats);
+
+// ── Merch Orders ──
+router.get("/orders/:eventId", protect, authorize("organizer"), getMerchOrders);
+router.patch("/orders/:registrationId/status", protect, authorize("organizer"), updateMerchOrderStatus);
 
 // ── Password Reset ──
 router.post("/request-password-reset", protect, authorize("organizer"), requestPasswordReset);

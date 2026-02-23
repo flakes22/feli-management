@@ -498,6 +498,22 @@ const OrganizerEventDetail = () => {
                   Delete
                 </Button>
               )}
+              {event.type === "MERCH" && (
+                <Button
+                  variant="contained"
+                  onClick={() => navigate(`/organizer/orders/${eventId}`)}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    bgcolor: "#e65100",
+                    color: "white",
+                    borderRadius: 2,
+                    "&:hover": { bgcolor: "#f57c00" },
+                  }}
+                >
+                  Manage Payments
+                </Button>
+              )}
             </Box>
           </Box>
 

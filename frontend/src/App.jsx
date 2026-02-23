@@ -22,6 +22,7 @@ import CreateEvent from "./pages/CreateEvent";
 import OngoingEvents from "./pages/OngoingEvents";
 import ManageOrganizers from "./pages/ManageOrganizers";
 import AttendanceScanner from "./pages/AttendanceScanner";
+import MerchOrders from "./pages/MerchOrders";
 
 function App() {
   return (
@@ -42,10 +43,11 @@ function App() {
         {/* Organizer */}
         <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
         <Route path="/organizer/event/:eventId" element={<OrganizerEventDetail />} />
-        <Route path="/organizer/profile" element={<OrganizerProfile />}/>
-        <Route path="/organizer/create-event" element={<CreateEvent />}/>
-        <Route path="/organizer/ongoing" element={<OngoingEvents />}/>
+        <Route path="/organizer/profile" element={<OrganizerProfile />} />
+        <Route path="/organizer/create-event" element={<CreateEvent />} />
+        <Route path="/organizer/ongoing" element={<OngoingEvents />} />
         <Route path="/organizer/attendance/:eventId" element={<AttendanceScanner />} />
+        <Route path="/organizer/orders/:eventId" element={<MerchOrders />} />
         {/* Admin */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/manage-organizers" element={<ManageOrganizers />} />

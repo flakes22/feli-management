@@ -45,7 +45,7 @@ export const scanAttendance = async (req, res) => {
       return res.status(404).json({ message: "Event not found for this ticket" });
     }
 
-    if (event.organizerId.toString() !== organizerId) {
+    if (event.organizerId.toString() !== organizerId.toString()) {
       return res.status(403).json({ message: "Not your event" });
     }
 
@@ -124,7 +124,7 @@ export const getAttendanceStats = async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    if (event.organizerId.toString() !== organizerId) {
+    if (event.organizerId.toString() !== organizerId.toString()) {
       return res.status(403).json({ message: "Not your event" });
     }
 
@@ -184,7 +184,7 @@ export const exportAttendanceCSV = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
-    if (event.organizerId.toString() !== organizerId) {
+    if (event.organizerId.toString() !== organizerId.toString()) {
       return res.status(403).json({ message: "Not your event" });
     }
 
@@ -239,7 +239,7 @@ export const manualAttendanceOverride = async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    if (event.organizerId.toString() !== organizerId) {
+    if (event.organizerId.toString() !== organizerId.toString()) {
       return res.status(403).json({ message: "Not your event" });
     }
 
