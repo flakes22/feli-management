@@ -223,18 +223,57 @@ export const getEventDetails = async (req, res) => {
 
 export const getTrendingEvents = async (req, res) => {
   try {
-    const participant = await Participant.findById(req.user.id).select("interests");
-    const participantInterests = normalizeInterests(participant?.interests || []);
+    const { search, type, category, eligibility, startDate, endDate, followedOnly } = req.query;
 
-    const events = await Event.find({
+    const participant = await Participant.findById(req.user.id).select("interests followedOrganizers");
+    const participantInterests = normalizeInterests(participant?.interests || []);
+    const followedOrgIds = new Set(
+      (participant?.followedOrganizers || []).map((id) => id.toString())
+    );
+
+    let query = {
       status: "PUBLISHED",
       startDate: { $gte: new Date() },
-    })
+    };
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+    if (type) query.type = type;
+
+    const events = await Event.find(query)
       .populate("organizerId", "name category")
       .sort({ registrationCount: -1 })
       .limit(50);
 
-    const ranked = events
+    let filteredEvents = events;
+    if (category) {
+      filteredEvents = events.filter((e) => e.organizerId?.category === category);
+    }
+    if (eligibility) {
+      const elig = eligibility.toLowerCase();
+      filteredEvents = filteredEvents.filter((e) =>
+        (e.eligibility || "").toLowerCase().includes(elig)
+      );
+    }
+    if (startDate) {
+      const start = new Date(startDate);
+      filteredEvents = filteredEvents.filter((e) => !e.startDate || new Date(e.startDate) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      filteredEvents = filteredEvents.filter((e) => !e.startDate || new Date(e.startDate) <= end);
+    }
+    if (String(followedOnly) === "true") {
+      filteredEvents = filteredEvents.filter(
+        (e) => e.organizerId?._id && followedOrgIds.has(e.organizerId._id.toString())
+      );
+    }
+
+    const ranked = filteredEvents
       .map((event) => {
         const interestScore = getInterestScore(event, participantInterests);
         const popularity = Number(event.registrationCount || 0);

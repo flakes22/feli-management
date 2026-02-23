@@ -16,9 +16,10 @@ import {
   Chip,
   IconButton,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import API from "../services/api";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
+import ReCAPTCHA from "react-google-recaptcha";
+import AddIcon from "@mui/icons-material/Add";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ const Signup = () => {
   const [interestInput, setInterestInput] = useState("");
   const [interests, setInterests] = useState([]);
   const [onboardingSaving, setOnboardingSaving] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
 
   const handleChange = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value });
@@ -87,11 +89,17 @@ const Signup = () => {
       return;
     }
 
+    if (!captchaToken) {
+      setError("Please verify that you are not a robot.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
       const { confirmPassword, ...payload } = form;
+      payload.captchaToken = captchaToken;
 
       const res = await API.post("/auth/register", payload);
 
@@ -345,6 +353,13 @@ const Signup = () => {
           onKeyDown={handleKeyDown}
           sx={{ mb: 3 }}
         />
+
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+          <ReCAPTCHA
+            sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+            onChange={(token) => setCaptchaToken(token)}
+          />
+        </Box>
 
         <Button
           variant="contained"

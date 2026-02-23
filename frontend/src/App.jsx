@@ -39,7 +39,7 @@ function App() {
         <Route path="/participant/clubs" element={<ClubsOrganizers />} />
         <Route path="/participant/profile" element={<ParticipantProfile />} />
         <Route path="/participant/event/:eventId" element={<EventDetails />} />
-        <Route path="/participant/club/:clubId" element={<ClubDetails />} />
+        <Route path="/participant/club/:organizerId" element={<ClubDetails />} />
         {/* Organizer */}
         <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
         <Route path="/organizer/event/:eventId" element={<OrganizerEventDetail />} />

@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import API from "../services/api";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
+import ReCAPTCHA from "react-google-recaptcha";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,10 +21,16 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("participant");
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
       alert("Please fill in all fields");
+      return;
+    }
+
+    if (!captchaToken) {
+      alert("Please verify that you are not a robot.");
       return;
     }
 
@@ -32,6 +39,8 @@ const Login = () => {
       const res = await API.post("/auth/login", {
         email,
         password,
+        role,
+        captchaToken,
       });
 
       localStorage.setItem("token", res.data.token);
@@ -148,6 +157,13 @@ const Login = () => {
           onKeyDown={handleKeyDown}
           sx={{ mb: 3 }}
         />
+
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+          <ReCAPTCHA
+            sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+            onChange={(token) => setCaptchaToken(token)}
+          />
+        </Box>
 
         <Button
           variant="contained"

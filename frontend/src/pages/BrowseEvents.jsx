@@ -51,7 +51,16 @@ const BrowseEvents = () => {
 
   const fetchTrending = async () => {
     try {
-      const res = await API.get("/participant/trending");
+      const res = await API.get("/participant/trending", {
+        params: {
+          search,
+          type,
+          eligibility,
+          startDate,
+          endDate,
+          followedOnly,
+        },
+      });
       setTrending(res.data);
     } catch (err) {
       console.error("Failed to fetch trending:", err);
@@ -161,7 +170,10 @@ const BrowseEvents = () => {
                 />
                 <Button
                   variant="contained"
-                  onClick={fetchEvents}
+                  onClick={() => {
+                    fetchEvents();
+                    fetchTrending();
+                  }}
                   sx={{
                     textTransform: "none",
                     fontWeight: 600,
