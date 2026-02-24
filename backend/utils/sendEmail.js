@@ -33,7 +33,7 @@ export const sendTicketEmail = async ({
   const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, "");
 
   const mailOptions = {
-    from: `"Best Fest management" <${process.env.EMAIL_USER}>`,
+    from: `"Feli Management" <${process.env.EMAIL_USER}>`,
     to: toEmail,
     subject: `🎟️ Your Ticket for ${eventName}`,
     html: `
