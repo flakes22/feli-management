@@ -11,10 +11,7 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  IconButton,
 } from "@mui/material";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
-import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import AddIcon from "@mui/icons-material/Add";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import PeopleIcon from "@mui/icons-material/People";
@@ -26,10 +23,8 @@ const OrganizerDashboard = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [carouselIndex, setCarouselIndex] = useState(0);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const CARDS_PER_PAGE = 3;
 
   const fetchEvents = async () => {
     try {
@@ -48,21 +43,6 @@ const OrganizerDashboard = () => {
   useEffect(() => {
     fetchEvents();
   }, []);
-
-  const handlePrev = () => {
-    setCarouselIndex((prev) => Math.max(0, prev - CARDS_PER_PAGE));
-  };
-
-  const handleNext = () => {
-    setCarouselIndex((prev) =>
-      Math.min(events.length - CARDS_PER_PAGE, prev + CARDS_PER_PAGE)
-    );
-  };
-
-  const visibleEvents = events.slice(
-    carouselIndex,
-    carouselIndex + CARDS_PER_PAGE
-  );
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -147,36 +127,6 @@ const OrganizerDashboard = () => {
             >
               Your Events
             </Typography>
-
-            {/* Carousel Controls */}
-            {events.length > CARDS_PER_PAGE && (
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <IconButton
-                  onClick={handlePrev}
-                  disabled={carouselIndex === 0}
-                  sx={{
-                    border: "1px solid #e0e0e0",
-                    bgcolor: "white",
-                    "&:disabled": { opacity: 0.4 },
-                    "&:hover": { bgcolor: "#f5f5f5" },
-                  }}
-                >
-                  <ArrowBackIosIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  onClick={handleNext}
-                  disabled={carouselIndex + CARDS_PER_PAGE >= events.length}
-                  sx={{
-                    border: "1px solid #e0e0e0",
-                    bgcolor: "white",
-                    "&:disabled": { opacity: 0.4 },
-                    "&:hover": { bgcolor: "#f5f5f5" },
-                  }}
-                >
-                  <ArrowForwardIosIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            )}
           </Box>
 
           {loading ? (
@@ -228,7 +178,7 @@ const OrganizerDashboard = () => {
           ) : (
             <>
               <Grid container spacing={3}>
-                {visibleEvents.map((event) => {
+                {events.map((event) => {
                   const statusConfig = getStatusConfig(event.status);
                   return (
                     <Grid item xs={12} md={4} key={event._id}>
@@ -390,38 +340,6 @@ const OrganizerDashboard = () => {
                   );
                 })}
               </Grid>
-
-              {/* Carousel Dots */}
-              {events.length > CARDS_PER_PAGE && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    gap: 1,
-                    mt: 3,
-                  }}
-                >
-                  {Array.from({
-                    length: Math.ceil(events.length / CARDS_PER_PAGE),
-                  }).map((_, i) => (
-                    <Box
-                      key={i}
-                      onClick={() => setCarouselIndex(i * CARDS_PER_PAGE)}
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        cursor: "pointer",
-                        bgcolor:
-                          Math.floor(carouselIndex / CARDS_PER_PAGE) === i
-                            ? "#673ab7"
-                            : "#e0e0e0",
-                        transition: "all 0.3s",
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
             </>
           )}
         </Box>

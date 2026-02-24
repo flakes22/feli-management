@@ -95,7 +95,7 @@ export const registerParticipant = async (req, res) => {
 
     if (
       participantType === "IIIT" &&
-      !email.endsWith("@students.iiit.ac.in" || "@research.iiit.ac.in")
+      !(email.endsWith("@students.iiit.ac.in") || email.endsWith("@research.iiit.ac.in"))
     ) {
       return res.status(400).json({
         message: "IIIT participants must use IIIT email",
