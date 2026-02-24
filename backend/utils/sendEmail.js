@@ -35,63 +35,25 @@ export const sendTicketEmail = async ({
   const mailOptions = {
     from: `"Feli Management" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `🎟️ Your Ticket for ${eventName}`,
+    subject: ` Your Ticket for ${eventName}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+      <div style="font-family: sans-serif; color: #333;">
+        <h2>Registration Confirmed!</h2>
+        <p>Hi <strong>${participantName}</strong>,</p>
+        <p>Your registration for <strong>${eventName}</strong> is confirmed.</p>
         
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #673ab7, #9c27b0); padding: 32px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">🎟️ Registration Confirmed!</h1>
-          <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0 0;">You're all set for the event</p>
+        <ul>
+          <li><strong>Date:</strong> ${eventDate}</li>
+          <li><strong>Venue:</strong> ${eventVenue || "To be announced"}</li>
+          <li><strong>Ticket Number:</strong> ${ticketNumber}</li>
+        </ul>
+
+        <p>Please find your QR code below. Show this at the entrance for check-in:</p>
+        <div>
+          <img src="cid:qrcode" alt="QR Code" width="200" height="200" style="border: 1px solid #ccc; padding: 10px;" />
         </div>
 
-        <!-- Body -->
-        <div style="padding: 32px;">
-          <p style="font-size: 16px; color: #333;">Hi <strong>${participantName}</strong>,</p>
-          <p style="color: #555;">Your registration has been confirmed. Here are your details:</p>
-
-          <!-- Event Details Card -->
-          <div style="background: #f9f5ff; border-left: 4px solid #673ab7; border-radius: 8px; padding: 20px; margin: 24px 0;">
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; color: #888; font-size: 13px; width: 120px;"> Event</td>
-                <td style="padding: 8px 0; color: #1a1a2e; font-weight: 700; font-size: 15px;">${eventName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #888; font-size: 13px;">📆 Date</td>
-                <td style="padding: 8px 0; color: #333;">${eventDate}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #888; font-size: 13px;">📍 Venue</td>
-                <td style="padding: 8px 0; color: #333;">${eventVenue || "To be announced"}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #888; font-size: 13px;">🎫 Ticket No.</td>
-                <td style="padding: 8px 0; color: #673ab7; font-weight: 700; font-family: monospace; font-size: 14px;">${ticketNumber}</td>
-              </tr>
-            </table>
-          </div>
-
-          <!-- QR Code -->
-          <div style="text-align: center; margin: 28px 0;">
-            <p style="color: #555; margin-bottom: 12px; font-size: 14px;">
-              Show this QR code at the entrance for check-in:
-            </p>
-            <!-- cid:qrcode references the inline attachment below -->
-            <img src="cid:qrcode" alt="QR Code" style="width: 200px; height: 200px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px;" />
-          </div>
-
-          <p style="color: #888; font-size: 13px; text-align: center;">
-            If you have any questions, please contact the event organizer.
-          </p>
-        </div>
-
-        <!-- Footer -->
-        <div style="background: #f5f5f5; padding: 16px; text-align: center;">
-          <p style="margin: 0; color: #aaa; font-size: 12px;">
-            © ${new Date().getFullYear()} Feli Management · This is an automated email, please do not reply.
-          </p>
-        </div>
+        <p><small>If you have any questions, please contact the event organizer.</small></p>
       </div>
     `,
     attachments: [
