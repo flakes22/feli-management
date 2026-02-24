@@ -136,11 +136,14 @@ npm install
 ```
 
 Configure Environment Variables:
-Create a `.env` file inside the `frontend` directory:
+- To run locally, Create a `.env.development` file inside the `frontend` directory:
 ```env
 VITE_API_URL=http://localhost:5001/api
 ```
-
+- To run the deployed site, Create a `.env.development` file inside the `frontend` directory:
+```env
+VITE_API_URL=https://feli-management.onrender.com/api
+```
 Start the Frontend Dev Server:
 ```bash
 npm run dev
