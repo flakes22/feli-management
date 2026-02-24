@@ -165,7 +165,7 @@ const DiscussionForum = ({ eventId }) => {
 
   const react = async (messageId, type) => {
     try {
-      await API.patch(`/discussions/react/${messageId}`, { type });
+      await API.patch(`/discussions/${messageId}/react`, { type });
       await fetchMessages();
     } catch (err) {
       setNotice({
@@ -189,7 +189,7 @@ const DiscussionForum = ({ eventId }) => {
 
   const togglePin = async (messageId, isPinned) => {
     try {
-      await API.patch(`/discussions/pin/${messageId}`, { isPinned: !isPinned });
+      await API.patch(`/discussions/${messageId}/pin`, { isPinned: !isPinned });
       await fetchMessages();
     } catch (err) {
       setNotice({
@@ -325,7 +325,7 @@ const DiscussionForum = ({ eventId }) => {
       {notice && <Alert severity={notice.type} sx={{ mb: 1.5 }}>{notice.text}</Alert>}
       {!canPost && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
-          Register for this event to post, reply, and react in the discussion forum.
+          Register for this event to post and reply in the discussion forum.
         </Alert>
       )}
 

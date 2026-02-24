@@ -194,7 +194,7 @@ const BrowseEvents = () => {
         {trending.length > 0 && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" sx={{ fontWeight: 700, color: "#1a1a2e", mb: 2 }}>
-              🔥 Trending Events
+              Trending Events
             </Typography>
             <Grid container spacing={2}>
               {trending.map((event) => (
@@ -215,7 +215,7 @@ const BrowseEvents = () => {
                           {event.name}
                         </Typography>
                         <Chip
-                          label="🔥 Trending"
+                          label="Trending"
                           size="small"
                           sx={{ bgcolor: "#fff3e0", color: "#e65100", fontWeight: 600, fontSize: "0.7rem" }}
                         />

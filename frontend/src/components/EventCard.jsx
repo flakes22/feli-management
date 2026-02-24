@@ -62,7 +62,7 @@ const EventCard = ({ registration, onViewTicket }) => {
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
               <Chip
-                label={event.type === "MERCH" ? "Merchandise" : "Workshop"}
+                label={event.type === "MERCH" ? "Merchandise" : "Normal Event"}
                 size="small"
                 sx={{
                   bgcolor: "#f3e8ff",
@@ -82,9 +82,9 @@ const EventCard = ({ registration, onViewTicket }) => {
               <Typography variant="body2" sx={{ color: "#666" }}>
                 Date: <strong>{formatDate(event.startDate)}</strong>
               </Typography>
-              {event.description && (
+              {event.venue && (
                 <Typography variant="body2" sx={{ color: "#666" }}>
-                  Venue: <strong>{event.description}</strong>
+                  Venue: <strong>{event.venue}</strong>
                 </Typography>
               )}
             </Box>

@@ -376,7 +376,7 @@ const EventDetails = () => {
 
               <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
                 <Chip
-                  label={event.type === "NORMAL" ? "Workshop" : "Merchandise"}
+                  label={event.type === "NORMAL" ? "Normal Event" : "Merchandise"}
                   size="small"
                   sx={{ bgcolor: "#e3f2fd", color: "#1976d2", fontWeight: 600 }}
                 />

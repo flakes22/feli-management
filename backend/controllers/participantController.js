@@ -302,7 +302,7 @@ export const getTrendingEvents = async (req, res) => {
         };
       })
       .sort((a, b) => b.score - a.score)
-      .slice(0, 10)
+      .slice(0, 5)
       .map((item) => item.event);
 
     res.json(ranked);

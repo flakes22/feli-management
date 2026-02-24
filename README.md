@@ -23,6 +23,7 @@ This is a comprehensive full-stack web application designed for managing events,
 - **Multer (`multer`)**: Middleware for handling `multipart/form-data`, enabling the application to accept file uploads (e.g., event banners or profile pictures).
 - **Socket.io (`socket.io`)**: The server counterpart for real-time bilateral communication, utilized to instantly broadcast updates to connected clients.
 - **Nodemailer (`nodemailer`)**: A module for sending emails from Node.js. It performs critical automated tasks like dispatching registration confirmations, OTPs, or event tickets directly to users' inboxes.
+( I want able to log in to SendGrid so i didnt change this) 
 - **QR Code (`qrcode`)**: A library deployed to generate QR codes containing registration identifiers on the backend, which are included in emails or fetched by the user as proof of registration.
 - **Json2CSV (`json2csv`)**: Resolves the administrative requirement of exporting data. It allows Organizers and Admins to effortlessly convert participant lists and custom form responses into downloadable CSV spreadsheets.
 - **Cors (`cors`)**: Middleware to enable Cross-Origin Resource Sharing, necessary to allow the frontend application to send requests to the backend API seamlessly across different local or deployed ports.

@@ -96,6 +96,17 @@ const TicketModal = ({ open, onClose, registration }) => {
           </Box>
         )}
 
+        {event?.venue && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ color: "#888", mb: 0.3 }}>
+              Venue
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {event.venue}
+            </Typography>
+          </Box>
+        )}
+
         <Divider sx={{ mb: 2 }} />
 
         {/* QR Code */}

@@ -144,9 +144,10 @@ export const updateEvent = async (req, res) => {
     }
 
     if (status === "PUBLISHED") {
-      const { description, registrationDeadline, maxParticipants, status: newStatus } = req.body;
+      const { description, venue, registrationDeadline, maxParticipants, status: newStatus } = req.body;
       if (newStatus) event.status = newStatus;
       if (description !== undefined) event.description = description;
+      if (venue !== undefined) event.venue = venue;
       if (registrationDeadline) {
         if (new Date(registrationDeadline) < new Date(event.registrationDeadline))
           return res.status(400).json({ message: "Cannot shorten registration deadline." });
