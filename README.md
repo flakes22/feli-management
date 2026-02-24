@@ -150,3 +150,6 @@ npm run dev
 ### 4. Access the Application
 - Open your browser and navigate to the frontend URL locally, usually `http://localhost:5173`.
 - The application should now have connectivity to the backend local server (on Port `5001`), and you are ready to use the app!
+- The Admin credentials are:
+    - Email: admin@felictity.com
+    - Password: admin123
